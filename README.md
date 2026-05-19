@@ -145,6 +145,47 @@ SkydiverSimulator_AmirSari/
 
 ---
 
+## VR Setup for Oculus Quest 2
+
+### Packages added (auto-install on first open)
+- `com.unity.xr.management` 4.4.0 — XR Plugin Management
+- `com.unity.xr.oculus` 4.2.0 — Oculus XR Plugin for Quest 2
+
+### One-time manual steps in Unity Editor (Sari must do this once)
+
+After opening the project for the first time after pulling this commit:
+
+1. Wait for packages to import (progress bar in bottom-right)
+2. Go to **Edit > Project Settings > XR Plug-in Management**
+3. If prompted to install XR Plug-in Management, click **Install**
+4. Click the **Android** tab (the robot icon)
+5. Check the box next to **Oculus**
+6. Close Project Settings
+7. Go to **Edit > Project Settings > XR Plug-in Management > Oculus** (Android tab)
+8. Set **Target Devices** → check **Quest 2**
+9. **Cmd+S** to save, then `git add . && git commit -m "XR: enable Oculus loader for Android" && git push`
+
+### Scene setup (do after the above steps)
+1. Open `Assets/Integration_Ready.unity`
+2. Select **Main Camera** in the Hierarchy
+3. Click **Add Component** → search for **VR Camera Rig** → add it
+4. Drag **Main Camera** into the **Camera Follow** slot on `VRCameraRig`
+5. Save the scene with **Cmd+S**
+
+### Build for Quest 2
+1. **File > Build Settings**
+2. Platform: **Android** → click **Switch Platform**
+3. Click **Player Settings** → set Company Name: `Technion`, Product Name: `SkydiverVR`
+4. In **Build Settings**, click **Build** (or **Build and Run** with headset connected via USB)
+5. The app ID is already set to `com.Technion.SkydiverVR`
+
+### VRCameraRig.cs — what it does
+- Attached to Main Camera alongside `CameraFollow`
+- On Quest 2 at runtime: detects active XR device, disables `CameraFollow` (headset drives camera instead), sets tracking origin to **Floor**
+- On desktop/editor: does nothing — `CameraFollow` works normally
+
+---
+
 ## What's Done So Far
 
 - [x] Unity project set up with XSens plugin
@@ -154,6 +195,8 @@ SkydiverSimulator_AmirSari/
 - [x] CameraFollow script (camera tracks avatar)
 - [x] SuspensionLines script (lines from canopy to shoulders)
 - [x] GitHub repo set up and shared
+- [x] VR packages added (com.unity.xr.management + com.unity.xr.oculus) — see VR Setup section above
+- [x] VRCameraRig.cs script — handles VR/desktop camera switching
 
 ## What Still Needs To Be Done
 

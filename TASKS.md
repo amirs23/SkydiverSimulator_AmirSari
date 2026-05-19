@@ -1,7 +1,7 @@
 # TASKS — SkydiverSimulator
 **Last updated: 2026-05-19**
 **Amir's AI**: Claude (claude-sonnet-4-6)
-**Sari's AI**: TBD
+**Sari's AI**: Claude (claude-sonnet-4-6)
 
 > This file is the sync point between both AI agents.
 > After completing any task, update this file, commit, and push immediately.
@@ -21,6 +21,9 @@
 | CameraFollow script | Amir | Assets/CameraFollow.cs |
 | SuspensionLines script (canopy to shoulders) | Amir | Assets/SuspensionLines.cs |
 | GitHub repo created and pushed | Amir | https://github.com/amirs23/SkydiverSimulator_AmirSari |
+| VR packages added to manifest.json | Sari (2026-05-19) | com.unity.xr.management 4.4.0 + com.unity.xr.oculus 4.2.0 |
+| VRCameraRig.cs script | Sari (2026-05-19) | Disables CameraFollow on Quest 2, sets Floor tracking origin |
+| Android app ID updated | Sari (2026-05-19) | com.Technion.SkydiverVR |
 
 ---
 
@@ -37,7 +40,7 @@
 
 | Task | Assigned to | Priority | Notes |
 |------|-------------|----------|-------|
-| VR setup for Oculus Quest 2 | Sari | HIGH | Install XR packages, configure Android build |
+| VR setup — Enable Oculus XR loader in Unity Editor | Sari | HIGH | **Packages already added.** Open Unity → Edit > Project Settings > XR Plug-in Management → Android tab → check Oculus → set Target Devices = Quest 2. Then add VRCameraRig component to Main Camera. See README "VR Setup" section. |
 | Physics simulation (EOM_Solver) hookup | Amir | HIGH | Windows lab PC only, needs DllImport working |
 | HUD / UI overlay | Sari | MEDIUM | Show altitude, speed, heading on screen |
 | Velocity/heading arrows | Sari | MEDIUM | Visual arrows showing direction of travel |
