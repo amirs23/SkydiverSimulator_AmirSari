@@ -21,10 +21,10 @@ public class SkydiverHUD : MonoBehaviour
         var canvasGO = new GameObject("SkydiverHUD");
         canvasGO.transform.SetParent(transform, false);
 
-        // Position: lower-right corner of VR view, 0.6m in front of camera
-        canvasGO.transform.localPosition = new Vector3(0.18f, -0.12f, 0.6f);
+        // Position: top-left corner, 2m in front of camera
+        canvasGO.transform.localPosition = new Vector3(-1.8f, 0.8f, 2f);
         canvasGO.transform.localRotation = Quaternion.identity;
-        canvasGO.transform.localScale = Vector3.one * 0.0004f;
+        canvasGO.transform.localScale = Vector3.one * 0.002f;
 
         var canvas = canvasGO.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
