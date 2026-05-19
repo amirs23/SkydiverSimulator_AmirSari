@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 338867159}
   - component: {fileID: 338867158}
   - component: {fileID: 338867161}
+  - component: {fileID: 338867162}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -256,6 +257,21 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &338867162
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 338867157}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 655c2d9f4f29c481398c79e2ac72d907, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraFollow
+  target: {fileID: 1782691932}
+  offset: {x: 0, y: 4, z: -10}
+  smoothSpeed: 8
 --- !u!1 &393859706
 GameObject:
   m_ObjectHideFlags: 0
@@ -474,6 +490,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 32876ecdc200f40f3acc795a3c6709fa, type: 3}
+--- !u!4 &629398628 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6301254281182398258, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
+  m_PrefabInstance: {fileID: 1782691928}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &932176878
 GameObject:
   m_ObjectHideFlags: 0
@@ -526,6 +547,11 @@ MonoBehaviour:
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 1746841bed5d94189911042bd6527306, type: 3}
   m_PrefabInstance: {fileID: 1845585579}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1765700443 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3806027505601273513, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
+  m_PrefabInstance: {fileID: 1782691928}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1782691928
 PrefabInstance:
@@ -669,6 +695,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1782691931}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1782691933}
   m_SourcePrefab: {fileID: 100100000, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
 --- !u!1 &1782691929 stripped
 GameObject:
@@ -727,6 +756,23 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
   m_PrefabInstance: {fileID: 1782691928}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1782691933
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1782691929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d42decc57ec8249048ca367368cdb341, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SuspensionLines
+  canopy: {fileID: 1398738802}
+  leftShoulder: {fileID: 1765700443}
+  rightShoulder: {fileID: 629398628}
+  lineWidth: 0.02
+  canopySpread: 0.8
 --- !u!1 &1840702919
 GameObject:
   m_ObjectHideFlags: 0
@@ -864,11 +910,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 1746841bed5d94189911042bd6527306, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 1.5
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1746841bed5d94189911042bd6527306, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 2
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1746841bed5d94189911042bd6527306, type: 3}
       propertyPath: m_LocalPosition.z
