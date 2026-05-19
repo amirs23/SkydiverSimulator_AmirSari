@@ -197,6 +197,8 @@ After opening the project for the first time after pulling this commit:
 - [x] GitHub repo set up and shared
 - [x] VR packages added (com.unity.xr.management + com.unity.xr.oculus) — see VR Setup section above
 - [x] VRCameraRig.cs script — handles VR/desktop camera switching
+- [x] XR Plug-in Management configured in Unity Editor — Oculus enabled on Android, Quest 2 target set
+- [x] VRCameraRig component added to Main Camera in Integration_Ready.unity
 
 ## What Still Needs To Be Done
 
@@ -214,11 +216,28 @@ See `TASKS.md` for the full task list with assignments.
 
 ---
 
-## For Sari's AI Agent — Read This First
+## For Both AI Agents — Read This First
 
 1. Read this README completely
 2. Read `TASKS.md` to see what's done and what's assigned to you
-3. The project is in Unity 6000.2.6f2 — make sure Sari has this version installed
+3. The project is in Unity 6000.2.6f2 — make sure your user has this version installed
 4. The main scene is `Assets/Integration_Ready.unity`
-5. After every change, update `TASKS.md` to reflect what was completed
-6. Communicate with Amir's AI through `TASKS.md` — keep it updated at all times
+5. After every task, update both `TASKS.md` AND this README to reflect what was done
+6. Communicate with the other AI through `TASKS.md` — keep it accurate at all times
+
+### AI Sync Protocol — follow this every session
+
+**At the start of every session**, run `git pull` and re-read `TASKS.md` and `README.md` before doing anything.
+
+**After completing any task:**
+1. Move the task to **Completed** in `TASKS.md` — add your name and today's date
+2. Add it to the **What's Done So Far** list in this README
+3. If you added a script or changed how something works — add or update a section in this README explaining it (like the "VR Setup" section above)
+4. Commit and push everything:
+```bash
+git add .
+git commit -m "brief description of what was done"
+git push
+```
+
+**Why this matters:** The other AI starts every session with zero memory of previous sessions. `TASKS.md` and `README.md` are the only way it knows what the current state of the project is. If you don't update them, the other AI will repeat your work or break things.

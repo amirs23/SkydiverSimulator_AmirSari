@@ -1,5 +1,5 @@
 # TASKS — SkydiverSimulator
-**Last updated: 2026-05-19**
+**Last updated: 2026-05-19 (Sari)**
 **Amir's AI**: Claude (claude-sonnet-4-6)
 **Sari's AI**: Claude (claude-sonnet-4-6)
 
@@ -24,6 +24,7 @@
 | VR packages added to manifest.json | Sari (2026-05-19) | com.unity.xr.management 4.4.0 + com.unity.xr.oculus 4.2.0 |
 | VRCameraRig.cs script | Sari (2026-05-19) | Disables CameraFollow on Quest 2, sets Floor tracking origin |
 | Android app ID updated | Sari (2026-05-19) | com.Technion.SkydiverVR |
+| VR setup fully configured in Unity Editor | Sari (2026-05-19) | XR Plug-in Management → Android → Oculus checked, Quest 2 target set, VRCameraRig added to Main Camera, scene saved |
 
 ---
 
@@ -40,9 +41,10 @@
 
 | Task | Assigned to | Priority | Notes |
 |------|-------------|----------|-------|
-| VR setup — Enable Oculus XR loader in Unity Editor | Sari | HIGH | **Packages already added.** Open Unity → Edit > Project Settings > XR Plug-in Management → Android tab → check Oculus → set Target Devices = Quest 2. Then add VRCameraRig component to Main Camera. See README "VR Setup" section. |
+| Physics simulation (EOM_Solver) hookup | Amir | HIGH | Windows lab PC only, needs DllImport working |
 | Physics simulation (EOM_Solver) hookup | Amir | HIGH | Windows lab PC only, needs DllImport working |
 | HUD / UI overlay | Sari | MEDIUM | Show altitude, speed, heading on screen |
+
 | Velocity/heading arrows | Sari | MEDIUM | Visual arrows showing direction of travel |
 | Wind/environment effects | TBD | LOW | |
 | Landing zone marker | TBD | LOW | Target on ground the skydiver aims for |

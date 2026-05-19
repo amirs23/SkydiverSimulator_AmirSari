@@ -132,6 +132,7 @@ GameObject:
   - component: {fileID: 338867158}
   - component: {fileID: 338867161}
   - component: {fileID: 338867162}
+  - component: {fileID: 338867163}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -272,6 +273,19 @@ MonoBehaviour:
   target: {fileID: 1782691932}
   offset: {x: 0, y: 4, z: -10}
   smoothSpeed: 8
+--- !u!114 &338867163
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 338867157}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3f7c2e1d4b85609f2e3a1c7d9b04e6f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VRCameraRig
+  cameraFollow: {fileID: 338867162}
 --- !u!1 &393859706
 GameObject:
   m_ObjectHideFlags: 0
