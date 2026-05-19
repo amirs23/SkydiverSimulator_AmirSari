@@ -43,12 +43,9 @@
 | Task | Assigned to | Priority | Notes |
 |------|-------------|----------|-------|
 | Physics simulation (EOM_Solver) hookup | Amir | HIGH | Windows lab PC only, needs DllImport working |
-| Physics simulation (EOM_Solver) hookup | Amir | HIGH | Windows lab PC only, needs DllImport working |
-| ~~HUD / UI overlay~~ | ~~Sari~~ | ~~MEDIUM~~ | Done — see Completed |
-
-| Velocity/heading arrows | Sari | MEDIUM | Visual arrows showing direction of travel |
-| Wind/environment effects | TBD | LOW | |
-| Landing zone marker | TBD | LOW | Target on ground the skydiver aims for |
+| Velocity/heading arrows | Amir | MEDIUM | Visual arrows showing direction of travel |
+| Wind/environment effects | Amir | LOW | |
+| Landing zone marker | Amir | LOW | Target on ground the skydiver aims for |
 
 ---
 
