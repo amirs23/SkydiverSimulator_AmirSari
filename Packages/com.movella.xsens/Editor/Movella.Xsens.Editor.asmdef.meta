@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 11486122e4c829c4c997f1fb630fccd5
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 11338
+  packageName: MVN Live Animation
+  packageVersion: 2023.0.1
+  assetPath: Packages/com.movella.xsens/Editor/Movella.Xsens.Editor.asmdef
+  uploadId: 618093

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ff0dc0810c539654f9032f6d35e1de74
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 11338
+  packageName: MVN Live Animation
+  packageVersion: 2023.0.1
+  assetPath: Packages/com.movella.xsens/Samples~/Streaming Demo/Scenes/StreamingDemo.unity
+  uploadId: 618093

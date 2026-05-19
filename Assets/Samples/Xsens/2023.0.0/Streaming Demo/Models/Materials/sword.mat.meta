@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 67710635cab23ef4286b1b2c2107e7fe
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 11338
+  packageName: MVN Live Animation
+  packageVersion: 2023.0.1
+  assetPath: Packages/com.movella.xsens/Samples~/Streaming Demo/Models/Materials/sword.mat
+  uploadId: 618093

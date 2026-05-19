@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 96d5ec9d48b9ada41bfff2a8677d3228
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 11338
+  packageName: MVN Live Animation
+  packageVersion: 2023.0.1
+  assetPath: Packages/com.movella.xsens/Runtime/Scripts/XsensTypes.cs
+  uploadId: 618093

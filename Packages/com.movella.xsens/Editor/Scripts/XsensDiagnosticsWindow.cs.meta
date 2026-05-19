@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 8ca518cb4bbc8c94895db7b7b014ff04
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 11338
+  packageName: MVN Live Animation
+  packageVersion: 2023.0.1
+  assetPath: Packages/com.movella.xsens/Editor/Scripts/XsensDiagnosticsWindow.cs
+  uploadId: 618093

@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: bc47e4ce86403ad49827a50adb23acd1
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 11338
+  packageName: MVN Live Animation
+  packageVersion: 2023.0.1
+  assetPath: Packages/com.movella.xsens/Editor/Scripts/TPoseEditor.cs
+  uploadId: 618093

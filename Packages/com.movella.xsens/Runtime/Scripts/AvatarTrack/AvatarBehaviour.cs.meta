@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 3461dcac7f315ae45a3e5833866fac5d
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 11338
+  packageName: MVN Live Animation
+  packageVersion: 2023.0.1
+  assetPath: Packages/com.movella.xsens/Runtime/Scripts/AvatarTrack/AvatarBehaviour.cs
+  uploadId: 618093

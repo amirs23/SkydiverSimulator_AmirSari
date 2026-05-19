@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d765f1e2236fa8241a076707ad290855
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 11338
+  packageName: MVN Live Animation
+  packageVersion: 2023.0.1
+  assetPath: Packages/com.movella.xsens/Samples~/Streaming Demo/Models/Materials/chest_logo.mat
+  uploadId: 618093
