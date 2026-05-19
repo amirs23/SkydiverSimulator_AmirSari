@@ -179,6 +179,28 @@ After opening the project for the first time after pulling this commit:
 4. In **Build Settings**, click **Build** (or **Build and Run** with headset connected via USB)
 5. The app ID is already set to `com.Technion.SkydiverVR`
 
+---
+
+## HUD Overlay
+
+### SkydiverHUD.cs — what it does
+Displays a heads-up display in the lower-right corner of the VR view showing:
+- **ALT** — canopy altitude in meters
+- **SPD** — horizontal speed in km/h
+- **HDG** — heading in degrees (0–360°)
+
+The canvas is created entirely in code — no manual UI setup needed. It attaches itself to the Main Camera as a world-space canvas 0.6m in front, so it follows the player's head in VR.
+
+Shows zeros as placeholders until EOM_Solver physics are running.
+
+### Scene setup for HUD
+1. Select **Main Camera** in Hierarchy
+2. Click **Add Component** → search **SkydiverHUD** → add it
+3. Drag the **Canopy_Rotated** object's **Rigidbody** into the **Canopy Rigidbody** slot
+4. **Cmd+S** to save
+
+---
+
 ### VRCameraRig.cs — what it does
 - Attached to Main Camera alongside `CameraFollow`
 - On Quest 2 at runtime: detects active XR device, disables `CameraFollow` (headset drives camera instead), sets tracking origin to **Floor**
@@ -199,6 +221,7 @@ After opening the project for the first time after pulling this commit:
 - [x] VRCameraRig.cs script — handles VR/desktop camera switching
 - [x] XR Plug-in Management configured in Unity Editor — Oculus enabled on Android, Quest 2 target set
 - [x] VRCameraRig component added to Main Camera in Integration_Ready.unity
+- [x] HUD overlay (SkydiverHUD.cs) — shows altitude, speed, heading in VR
 
 ## What Still Needs To Be Done
 

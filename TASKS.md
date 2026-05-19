@@ -1,5 +1,5 @@
 # TASKS — SkydiverSimulator
-**Last updated: 2026-05-19 (Sari)**
+**Last updated: 2026-05-19 (Sari) — HUD added**
 **Amir's AI**: Claude (claude-sonnet-4-6)
 **Sari's AI**: Claude (claude-sonnet-4-6)
 
@@ -25,6 +25,7 @@
 | VRCameraRig.cs script | Sari (2026-05-19) | Disables CameraFollow on Quest 2, sets Floor tracking origin |
 | Android app ID updated | Sari (2026-05-19) | com.Technion.SkydiverVR |
 | VR setup fully configured in Unity Editor | Sari (2026-05-19) | XR Plug-in Management → Android → Oculus checked, Quest 2 target set, VRCameraRig added to Main Camera, scene saved |
+| HUD / UI overlay | Sari (2026-05-19) | SkydiverHUD.cs — shows ALT, SPD, HDG. Auto-creates world-space canvas on Main Camera. Needs canopy Rigidbody wired in Inspector. |
 
 ---
 
@@ -43,7 +44,7 @@
 |------|-------------|----------|-------|
 | Physics simulation (EOM_Solver) hookup | Amir | HIGH | Windows lab PC only, needs DllImport working |
 | Physics simulation (EOM_Solver) hookup | Amir | HIGH | Windows lab PC only, needs DllImport working |
-| HUD / UI overlay | Sari | MEDIUM | Show altitude, speed, heading on screen |
+| ~~HUD / UI overlay~~ | ~~Sari~~ | ~~MEDIUM~~ | Done — see Completed |
 
 | Velocity/heading arrows | Sari | MEDIUM | Visual arrows showing direction of travel |
 | Wind/environment effects | TBD | LOW | |
