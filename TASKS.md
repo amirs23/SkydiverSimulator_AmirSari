@@ -1,5 +1,5 @@
 # TASKS — SkydiverSimulator
-**Last updated: 2026-05-19 (Sari) — HUD added**
+**Last updated: 2026-05-19 (Amir) — physics hookup, velocity arrows, wind, landing zone**
 **Amir's AI**: Claude (claude-sonnet-4-6)
 **Sari's AI**: Claude (claude-sonnet-4-6)
 
@@ -26,26 +26,22 @@
 | Android app ID updated | Sari (2026-05-19) | com.Technion.SkydiverVR |
 | VR setup fully configured in Unity Editor | Sari (2026-05-19) | XR Plug-in Management → Android → Oculus checked, Quest 2 target set, VRCameraRig added to Main Camera, scene saved |
 | HUD / UI overlay | Sari (2026-05-19) | SkydiverHUD.cs — shows ALT, SPD, HDG. Auto-creates world-space canvas on Main Camera. Needs canopy Rigidbody wired in Inspector. |
+| Physics simulation (EOM_Solver) hookup | Amir (2026-05-19) | PlayerMovement.cs fixed: rotation bug (quaternion→eulerAngles), camera override removed, cross-platform guard added (#if WIN). Works on all platforms; on Mac/Quest state passes through unchanged. |
+| Velocity/heading arrows | Amir (2026-05-19) | VelocityArrows.cs — cyan arrow = horizontal speed/direction, yellow arrow = vertical (descent). Attach to scene, drag canopy Rigidbody in Inspector. |
+| Wind/environment effects | Amir (2026-05-19) | WindEffect.cs — 60 cloud-sphere particles drift upward past the avatar giving sense of descent. Attach to scene, drag Avatar in Inspector. |
+| Landing zone marker | Amir (2026-05-19) | LandingZoneMarker.cs — pulsing orange bullseye (2 rings + crosshair) drawn with LineRenderers. Place GameObject on the ground at the target spot. |
 
 ---
 
 ## In Progress
 
-| Task | Assigned to | Status |
-|------|-------------|--------|
-| Canopy position fine-tuning | Amir | Positioning canopy above avatar head |
-| Suspension lines visual polish | Amir | Adjusting spread and attachment points |
+*(none)*
 
 ---
 
 ## To Do — Project 2 (VR Parachute)
 
-| Task | Assigned to | Priority | Notes |
-|------|-------------|----------|-------|
-| Physics simulation (EOM_Solver) hookup | Amir | HIGH | Windows lab PC only, needs DllImport working |
-| Velocity/heading arrows | Amir | MEDIUM | Visual arrows showing direction of travel |
-| Wind/environment effects | Amir | LOW | |
-| Landing zone marker | Amir | LOW | Target on ground the skydiver aims for |
+*(All tasks complete — see Completed section above)*
 
 ---
 

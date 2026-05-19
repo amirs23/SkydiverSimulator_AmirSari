@@ -104,10 +104,30 @@ Creates an 11×11 grid of spheres that follow the avatar to simulate flying thro
 
 ### `PlayerMovement.cs`
 Controls physics simulation using EOM_Solver.
-- **Windows lab PC only** — the DLL won't load on Mac
+- **Windows lab PC only** — on Mac/Quest the DLL call is skipped (state held constant via `#if UNITY_STANDALONE_WIN`)
 - Calls `EOM_Solver.dll` each FixedUpdate with current state
 - Returns next position/rotation for canopy and body
 - State vector is 24 doubles: [CanopyPos, CanopyRot, CanopyLinVel, CanopyAngVel, BodyPos, BodyRot, BodyLinVel, BodyAngVel]
+- Drag **rbCanopy** and **rbBody** Rigidbodies into the Inspector
+
+### `VelocityArrows.cs`
+Shows real-time velocity arrows on the canopy. Attach to a new empty GameObject in the scene.
+- **Cyan arrow** — horizontal velocity direction and speed
+- **Yellow arrow** — vertical velocity (pointing down = descending, up = climbing)
+- **canopyRigidbody**: drag the canopy Rigidbody in Inspector
+- **arrowScale**: 0.4 (world units per m/s)
+
+### `WindEffect.cs`
+Creates 60 small cloud-sphere particles that drift upward past the avatar, giving a sense of descent speed. Attach to a new empty GameObject in the scene.
+- **followTarget**: drag the Avatar transform in Inspector
+- **driftSpeed**: 8 m/s upward drift (simulates falling at 8 m/s)
+- **spawnRadius**: 10 m — particles spawn in a sphere this size around the avatar
+
+### `LandingZoneMarker.cs`
+Draws a pulsing orange bullseye on the ground as the target landing zone. Attach to a new empty GameObject and position it where you want the target.
+- Two rings + crosshair, all LineRenderers (no mesh or prefab needed)
+- **outerRadius**: 5 m, **innerRadius**: 1.2 m
+- **pulseSpeed**: 1.2 Hz — alpha pulses so it's visible from altitude
 
 ---
 
@@ -121,7 +141,10 @@ SkydiverSimulator_AmirSari/
 │   ├── CameraFollow.cs         — camera tracks avatar
 │   ├── SuspensionLines.cs      — lines from canopy to shoulders
 │   ├── SkyGrid.cs              — floating sphere grid
-│   ├── PlayerMovement.cs       — physics via EOM_Solver (Windows only)
+│   ├── PlayerMovement.cs       — physics via EOM_Solver (Windows only, no-op on Mac/Quest)
+│   ├── VelocityArrows.cs       — cyan/yellow velocity direction arrows on canopy
+│   ├── WindEffect.cs           — cloud-sphere wind particles (sense of descent)
+│   ├── LandingZoneMarker.cs    — pulsing orange bullseye target on ground
 │   ├── Plugins/
 │   │   └── EOM_Solver.dll      — aerodynamics engine (Windows only)
 │   ├── Integration_Ready.unity — main scene

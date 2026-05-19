@@ -1,18 +1,19 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.UIElements;
 using System.Runtime.InteropServices;
 
+// Attach to any GameObject in the scene.
+// Drag the canopy and body Rigidbodies into the Inspector slots.
+// EOM_Solver.dll is Windows-only — on Mac/Quest the physics step is skipped (state held constant).
 public class PlayerMovement : MonoBehaviour
 {
     public Rigidbody rbCanopy;
     public Rigidbody rbBody;
-    private State currentState;
-    private State nextState;
     public Transform playerTransform;
 
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
     [DllImport("EOM_Solver")]
-    public static extern void EOM_Solver(
+    private static extern void EOM_Solver_Native(
         double tCurrent,
         double[] xCurrentUnity_data,
         int[] xCurrentUnity_size,
@@ -20,22 +21,30 @@ public class PlayerMovement : MonoBehaviour
         double[] xNextUnity_data,
         int[] xNextUnity_size
     );
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+
+    private static void CallEOM(double t, double[] xCur, int[] xCurSize, double dt, double[] xNext, int[] xNextSize)
+        => EOM_Solver_Native(t, xCur, xCurSize, dt, xNext, xNextSize);
+#else
+    // EOM_Solver.dll is Windows-only — pass state through unchanged on other platforms
+    private static void CallEOM(double t, double[] xCur, int[] xCurSize, double dt, double[] xNext, int[] xNextSize)
+        => System.Array.Copy(xCur, xNext, xCur.Length);
+#endif
+
+    private State currentState = new State();
+    private State nextState    = new State();
+
     void Start()
     {
-        rbCanopy.useGravity = false;
-        rbBody.useGravity = false;
-        Debug.Log("Player is ready");
-        currentState = new State();
-        nextState = new State();
-
+        if (rbCanopy != null) rbCanopy.useGravity = false;
+        if (rbBody   != null) rbBody.useGravity   = false;
+        Debug.Log("PlayerMovement ready. Platform: " + Application.platform);
         currentState.RbToState(rbCanopy, rbBody);
-
     }
 
-    // Update is called once per frame
     void FixedUpdate()
     {
+        if (rbCanopy == null || rbBody == null) return;
+
         currentState.RbToState(rbCanopy, rbBody);
         nextState = GetNextStepState(currentState);
 
@@ -44,99 +53,46 @@ public class PlayerMovement : MonoBehaviour
         rbCanopy.MoveRotation(Quaternion.Euler(nextState.CanopyRot));
         rbBody.MoveRotation(Quaternion.Euler(nextState.BodyRot));
 
-        Camera.main.transform.position = nextState.CanopyPos - new Vector3(0,0,5);
-        Camera.main.transform.rotation = Quaternion.Euler(0,0,0);
-
         currentState = nextState;
-
     }
 
-    private void LateUpdate()
+    private State GetNextStepState(State current)
     {
-        if (playerTransform != null)
-        {
-        }
-    }
+        double t  = Time.time;
+        double dt = Time.fixedDeltaTime;
 
-    private State GetInitState()
-    {
+        double[] xCurrent    = current.StateToVec();
+        double[] xNext       = new double[24];
+        int[]    xCurSize    = new int[] { 24 };
+        int[]    xNextSize   = new int[] { 0 };
 
-        State initState = new State();
+        CallEOM(t, xCurrent, xCurSize, dt, xNext, xNextSize);
 
-
-        return initState;
-    }
-
-
-    private State GetNextStepState(State currentStateHere)
-    {
-
-        State nextStateHere = currentStateHere;
-        double timeStep = Time.deltaTime;     
-
-        // === Call Matlab here ===
-        double t = Time.time;
-        double dt = Time.deltaTime;
-
-        double[] xCurrent = currentStateHere.StateToVec();
-        double[] xNext = new double[24];
-        int[] xCurrentSize = new int[1] { 24 };
-        int[] xNextSize = new int[1] { 0 };
-
-        EOM_Solver(t, xCurrent, xCurrentSize, dt, xNext, xNextSize);
-        nextStateHere.VecToState(xNext);
-
-       // nextState = currentState;
-        // ========================
-
-        return nextStateHere;
+        State next = new State();
+        next.VecToState(xNext);
+        return next;
     }
 
     public double[] GetUserInput()
     {
-        double delteRight = 0;
-        double delteLeft = 0;      
-        double deltaLookUp = 0;
-        double deltaLookDown = 0;       
-        double deltaLookRight = 0;
-        double deltaLookLeft = 0;
+        double delteRight = 0, delteLeft = 0;
+        double deltaLookUp = 0, deltaLookDown = 0, deltaLookRight = 0, deltaLookLeft = 0;
 
-        if (Keyboard.current.dKey.isPressed) // Right turn
+        if (Keyboard.current != null)
         {
-            delteRight = 1;
+            if (Keyboard.current.dKey.isPressed) delteRight = 1;
+            if (Keyboard.current.aKey.isPressed) delteLeft  = 1;
         }
 
-        if (Keyboard.current.aKey.isPressed) // Left turn
-        {
-            delteLeft = 1;
-        }
-
-        //if (Keyboard.current.spaceKey.isPressed)
-        //{
-        //    if (rbCanopy.position.y <= 0.6)
-        //    {
-        //        rbCanopy.AddForce(0, 10000 * Time.deltaTime, 0);
-        //        Debug.Log("Space is pressed");
-        //    }
-        //}
-
-
-
-
-        double[] playerInput = { delteRight, delteLeft, deltaLookUp, deltaLookDown, deltaLookRight, deltaLookLeft };
-
-
-
-        return playerInput;
+        return new double[] { delteRight, delteLeft, deltaLookUp, deltaLookDown, deltaLookRight, deltaLookLeft };
     }
-
 
     public class State
     {
         public Vector3 CanopyPos;
-        public Vector3 CanopyRot;
+        public Vector3 CanopyRot;   // Euler angles (degrees)
         public Vector3 BodyPos;
-        public Vector3 BodyRot;
+        public Vector3 BodyRot;     // Euler angles (degrees)
         public Vector3 CanopyLinVel;
         public Vector3 CanopyAngVel;
         public Vector3 BodyLinVel;
@@ -144,88 +100,68 @@ public class PlayerMovement : MonoBehaviour
 
         public void RbToState(Rigidbody rbCanopy, Rigidbody rbBody)
         {
-            CanopyPos = new Vector3(rbCanopy.position.x, rbCanopy.position.y, rbCanopy.position.z);
-            CanopyRot = new Vector3(rbCanopy.rotation.x, rbCanopy.rotation.y, rbCanopy.rotation.z);
-            CanopyLinVel = rbCanopy.linearVelocity;
-            CanopyAngVel = rbCanopy.angularVelocity;
-            BodyPos = new Vector3(rbBody.position.x, rbBody.position.y, rbBody.position.z);
-            BodyRot = new Vector3(rbBody.rotation.x, rbBody.rotation.y, rbBody.rotation.z);
-            BodyLinVel = rbBody.linearVelocity;
-            BodyAngVel = rbBody.angularVelocity;
+            if (rbCanopy != null)
+            {
+                CanopyPos    = rbCanopy.position;
+                CanopyRot    = rbCanopy.rotation.eulerAngles; // was: quaternion components (bug)
+                CanopyLinVel = rbCanopy.linearVelocity;
+                CanopyAngVel = rbCanopy.angularVelocity;
+            }
+            if (rbBody != null)
+            {
+                BodyPos    = rbBody.position;
+                BodyRot    = rbBody.rotation.eulerAngles;     // was: quaternion components (bug)
+                BodyLinVel = rbBody.linearVelocity;
+                BodyAngVel = rbBody.angularVelocity;
+            }
         }
 
-        public void VecToState(double[] inVec)
+        public void VecToState(double[] v)
         {
-            this.CanopyPos = new Vector3((float)inVec[0], (float)inVec[1], (float)inVec[2]);
-            this.CanopyRot = new Vector3((float)inVec[3], (float)inVec[4], (float)inVec[5]);
-            this.CanopyLinVel = new Vector3((float)inVec[6], (float)inVec[7], (float)inVec[8]);
-            this.CanopyAngVel = new Vector3((float)inVec[9], (float)inVec[10], (float)inVec[11]);
-            this.BodyPos = new Vector3((float)inVec[12], (float)inVec[13], (float)inVec[14]);
-            this.BodyRot = new Vector3((float)inVec[15], (float)inVec[16], (float)inVec[17]);
-            this.BodyLinVel = new Vector3((float)inVec[18], (float)inVec[19], (float)inVec[20]);
-            this.BodyAngVel = new Vector3((float)inVec[21], (float)inVec[22], (float)inVec[23]);
+            CanopyPos    = new Vector3((float)v[0],  (float)v[1],  (float)v[2]);
+            CanopyRot    = new Vector3((float)v[3],  (float)v[4],  (float)v[5]);
+            CanopyLinVel = new Vector3((float)v[6],  (float)v[7],  (float)v[8]);
+            CanopyAngVel = new Vector3((float)v[9],  (float)v[10], (float)v[11]);
+            BodyPos      = new Vector3((float)v[12], (float)v[13], (float)v[14]);
+            BodyRot      = new Vector3((float)v[15], (float)v[16], (float)v[17]);
+            BodyLinVel   = new Vector3((float)v[18], (float)v[19], (float)v[20]);
+            BodyAngVel   = new Vector3((float)v[21], (float)v[22], (float)v[23]);
         }
 
         public double[] StateToVec()
         {
-            double[] stateVec = new double[24];
-            stateVec[0] = this.CanopyPos[0];
-            stateVec[1] = this.CanopyPos[1];
-            stateVec[2] = this.CanopyPos[2];
-            stateVec[3] = this.CanopyRot[0];
-            stateVec[4] = this.CanopyRot[1];
-            stateVec[5] = this.CanopyRot[2];
-            stateVec[6] = this.CanopyLinVel[0];
-            stateVec[7] = this.CanopyLinVel[1];
-            stateVec[8] = this.CanopyLinVel[2];
-            stateVec[9] = this.CanopyAngVel[0];
-            stateVec[10] = this.CanopyAngVel[1];
-            stateVec[11] = this.CanopyAngVel[2];
-            stateVec[12] = this.BodyPos[0];
-            stateVec[13] = this.BodyPos[1];
-            stateVec[14] = this.BodyPos[2];
-            stateVec[15] = this.BodyRot[0];
-            stateVec[16] = this.BodyRot[1];
-            stateVec[17] = this.BodyRot[2];
-            stateVec[18] = this.BodyLinVel[0];
-            stateVec[19] = this.BodyLinVel[1];
-            stateVec[20] = this.BodyLinVel[2];
-            stateVec[21] = this.BodyAngVel[0];
-            stateVec[22] = this.BodyAngVel[1];
-            stateVec[23] = this.BodyAngVel[2];
-            return stateVec;
+            return new double[]
+            {
+                CanopyPos.x,    CanopyPos.y,    CanopyPos.z,
+                CanopyRot.x,    CanopyRot.y,    CanopyRot.z,
+                CanopyLinVel.x, CanopyLinVel.y, CanopyLinVel.z,
+                CanopyAngVel.x, CanopyAngVel.y, CanopyAngVel.z,
+                BodyPos.x,      BodyPos.y,      BodyPos.z,
+                BodyRot.x,      BodyRot.y,      BodyRot.z,
+                BodyLinVel.x,   BodyLinVel.y,   BodyLinVel.z,
+                BodyAngVel.x,   BodyAngVel.y,   BodyAngVel.z,
+            };
         }
-
     }
 
     public class Control
     {
-        public double toggleRight; // Right toggle pull
-        public double toggleLeft; // Left toggle pull
-        public double toggleFrontRisers; // Front risers pull
-        public double toggleCG; // moving C.G sideways. Positive to right
+        public double toggleRight;
+        public double toggleLeft;
+        public double toggleFrontRisers;
+        public double toggleCG;
 
         public Control()
         {
-            toggleRight = 0;
-            toggleLeft = 0;
-            toggleFrontRisers = 0;
-            toggleCG = 0;
+            toggleRight = toggleLeft = toggleFrontRisers = toggleCG = 0;
         }
-        
-        public static Control Add(Control control1, Control control2)
+
+        public static Control Add(Control c1, Control c2) => new Control
         {
-            Control control3 = new Control();
-            control3.toggleRight = control1.toggleRight + control2.toggleRight;
-            control3.toggleLeft = control1.toggleLeft + control2.toggleLeft;
-            control3.toggleFrontRisers = control1.toggleFrontRisers + control2.toggleFrontRisers;
-            control3.toggleCG = control1.toggleCG + control2.toggleCG;
-
-
-            return control3;
-        }
-
+            toggleRight       = c1.toggleRight       + c2.toggleRight,
+            toggleLeft        = c1.toggleLeft        + c2.toggleLeft,
+            toggleFrontRisers = c1.toggleFrontRisers + c2.toggleFrontRisers,
+            toggleCG          = c1.toggleCG          + c2.toggleCG,
+        };
     }
-
-
 }
