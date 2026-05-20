@@ -1,5 +1,5 @@
 # TASKS — SkydiverSimulator
-**Last updated: 2026-05-19 (Amir) — physics hookup, velocity arrows, wind, landing zone**
+**Last updated: 2026-05-20 (Amir) — scene verified working, all scripts live in Integration_Ready.unity**
 **Amir's AI**: Claude (claude-sonnet-4-6)
 **Sari's AI**: Claude (claude-sonnet-4-6)
 
@@ -30,6 +30,7 @@
 | Velocity/heading arrows | Amir (2026-05-19) | VelocityArrows.cs — cyan arrow = horizontal speed/direction, yellow arrow = vertical (descent). Attach to scene, drag canopy Rigidbody in Inspector. |
 | Wind/environment effects | Amir (2026-05-19) | WindEffect.cs — 60 cloud-sphere particles drift upward past the avatar giving sense of descent. Attach to scene, drag Avatar in Inspector. |
 | Landing zone marker | Amir (2026-05-19) | LandingZoneMarker.cs — pulsing orange bullseye (2 rings + crosshair) drawn with LineRenderers. Place GameObject on the ground at the target spot. |
+| Scene wired up and verified on Mac | Amir (2026-05-20) | WindEffect (Avatar wired), LandingZoneMarker (at X:20 Z:20), VelocityArrows (canopy Rigidbody slot empty — activates when EOM_Solver runs on Windows) added to Integration_Ready.unity. XR packages conflict fixed (removed com.unity.xr.oculus — Sari must re-add on Windows build machine). Apply Root Motion unchecked on Avatar Animator. Scene verified: avatar animates, suspension lines connected, HUD working, wind particles visible, landing zone pulsing. |
 
 ---
 
@@ -81,3 +82,13 @@ git push
 |-------|-------------|--------|
 | EOM_Solver.dll is Windows-only, can't test physics on Mac | Amir | Open — test at lab |
 | Canopy mesh pivot is off-center (not at geometric center) | Amir | Workaround: use X offset in local position |
+| com.unity.xr.oculus removed from manifest — was incompatible with Unity 6 on Mac | Amir (2026-05-20) | Sari: re-add on Windows build machine using a Unity 6-compatible version (try com.unity.xr.oculus 4.3.0+) or switch to Meta XR SDK |
+
+## Note for Sari's AI — next session
+
+- Pull latest, open Integration_Ready.unity
+- The scene is fully working on Mac (no VR). All Project 2 scripts are live.
+- VelocityArrows needs canopy Rigidbody wired once physics runs on Windows
+- SkydiverHUD needs canopy Rigidbody wired in Inspector (drag Canopy_Rotated's Rigidbody into the slot)
+- XR/Oculus packages were removed due to Unity 6 incompatibility — re-add compatible version on Windows build machine before Quest 2 build
+- Project 1 (AR Freefall) not started — see To Do section above
