@@ -34,7 +34,9 @@ git pull
 | EOM_Solver physics DLL (Matlab-compiled) | ✓ present in Assets/Plugins/ |
 | Avatar skeleton + XSens pipeline | ✓ working |
 | Android APK build for Quest 2 | ✓ builds |
-| **Velocity arrows, landing zone** | ⏳ Amir in progress |
+| Velocity arrows (`VelocityArrows.cs`) | ✓ added by Amir 2026-05-21 |
+| Landing zone marker (`LandingZoneMarker.cs`) | ✓ added by Amir 2026-05-21 |
+| Wind effect (`WindEffect.cs`) | ✓ added by Amir 2026-05-21 |
 
 ---
 
