@@ -636,7 +636,7 @@ namespace Movella.Xsens
                 if (director != null)
                 {
                     var asset = clip.asset as AvatarPlayableAsset;
-                    asset.Avatar.exposedName = UnityEditor.GUID.Generate().ToString();
+                    asset.Avatar.exposedName = System.Guid.NewGuid().ToString("N");
 
                     director.SetReferenceValue(asset.Avatar.exposedName, avatar);
                 }

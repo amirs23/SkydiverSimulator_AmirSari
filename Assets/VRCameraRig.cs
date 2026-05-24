@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;
@@ -13,10 +14,22 @@ public class VRCameraRig : MonoBehaviour
 
     void Start()
     {
+        StartCoroutine(WaitForXR());
+    }
+
+    IEnumerator WaitForXR()
+    {
+        float timeout = 5f;
+        while (!XRSettings.isDeviceActive && timeout > 0f)
+        {
+            timeout -= Time.deltaTime;
+            yield return null;
+        }
+
         if (!XRSettings.isDeviceActive)
         {
-            Debug.Log("[VRCameraRig] No XR device active — desktop mode, CameraFollow unchanged.");
-            return;
+            Debug.Log("[VRCameraRig] No XR device active after 5s — desktop mode, CameraFollow unchanged.");
+            yield break;
         }
 
         Debug.Log($"[VRCameraRig] XR device active: {XRSettings.loadedDeviceName}");

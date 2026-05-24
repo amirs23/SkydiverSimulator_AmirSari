@@ -1,5 +1,5 @@
 # HANDOFF — SkydiverSimulator (VR Parachute, Quest 2)
-**Last updated: 2026-05-21**
+**Last updated: 2026-05-24**
 
 ---
 
@@ -33,10 +33,11 @@ git pull
 | HUD overlay (ALT / SPD / HDG) | ✓ complete |
 | EOM_Solver physics DLL (Matlab-compiled) | ✓ present in Assets/Plugins/ |
 | Avatar skeleton + XSens pipeline | ✓ working |
-| Android APK build for Quest 2 | ✓ builds |
+| Android APK build for Quest 2 | ✓ builds and deploys |
 | Velocity arrows (`VelocityArrows.cs`) | ✓ added by Amir 2026-05-21 |
 | Landing zone marker (`LandingZoneMarker.cs`) | ✓ added by Amir 2026-05-21 |
 | Wind effect (`WindEffect.cs`) | ✓ added by Amir 2026-05-21 |
+| Quest 2 head tracking (VR look-around) | ✗ not working — see open issues |
 
 ---
 
@@ -153,6 +154,15 @@ These resolve automatically from `Packages/manifest.json` — no manual steps ne
 - HUD shows zeros until `EOM_Solver` physics are running (canopy Rigidbody not assigned → shows 0,0,0).
 - XSens suit / Matlab stream is optional — avatar animates from XSens but the parachute physics are independent.
 - Never modify Anna's original Matlab scripts (`load_mvnx_and_animate.m`).
+
+### OPEN: Head tracking not working (2026-05-24)
+The app runs on Quest 2 and the scene is visible, but moving your head does not move the camera — the view is frozen.
+
+What was tried:
+1. Set `m_AutomaticLoading: 1` / `m_AutomaticRunning: 1` in `Assets/XR/XRGeneralSettingsPerBuildTarget.asset` — Oculus XR loader now auto-initializes on Android.
+2. Rewrote `VRCameraRig.cs` to use a coroutine (waits up to 5s for `XRSettings.isDeviceActive`) instead of checking on frame 1 — avoids the race condition where `CameraFollow` was never disabled.
+
+Neither fix resolved it. The scene uses a plain `Main Camera` GameObject — no XR Origin / XR Rig hierarchy. Next thing to try: **replace the Main Camera with a proper XR Origin prefab** (from `com.unity.xr.interaction.toolkit` or the `OVRCameraRig` from the Meta XR SDK). The current setup relies on the XR plugin driving a bare camera, which may not be supported in Unity 6.
 
 ---
 
