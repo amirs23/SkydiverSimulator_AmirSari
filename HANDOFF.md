@@ -1,5 +1,5 @@
 # HANDOFF — SkydiverSimulator (VR Parachute, Quest 2)
-**Last updated: 2026-05-24**
+**Last updated: 2026-05-26**
 
 ---
 
@@ -37,7 +37,11 @@ git pull
 | Velocity arrows (`VelocityArrows.cs`) | ✓ added by Amir 2026-05-21 |
 | Landing zone marker (`LandingZoneMarker.cs`) | ✓ added by Amir 2026-05-21 |
 | Wind effect (`WindEffect.cs`) | ✓ added by Amir 2026-05-21 |
-| Quest 2 head tracking (VR look-around) | ✗ not working — see open issues |
+| Quest 2 head tracking (VR look-around) | ✓ fixed 2026-05-26 — see VRCameraRig.cs |
+| Android parachute physics (no DLL) | ✓ fixed 2026-05-26 — pure C# model in PlayerMovement.cs |
+| Avatar materials visible on Quest | ✓ fixed 2026-05-26 — all XSens mats converted to URP/Lit |
+| Suspension lines connect to canopy | ✓ fixed 2026-05-26 — auto-finds mesh bounds, no manual transform needed |
+| Dev color scheme (lines/canopy/avatar) | ✓ added 2026-05-26 — DevColorize.cs, lines yellow |
 
 ---
 
@@ -126,8 +130,10 @@ If the XSens avatar pipeline is needed:
 | `Assets/PlayerMovement.cs` | Physics — calls `EOM_Solver.dll` each FixedUpdate for canopy + body state |
 | `Assets/SkydiverHUD.cs` | ALT / SPD / HDG overlay driven by canopy Rigidbody velocity |
 | `Assets/SkyGrid.cs` | Sky environment grid |
-| `Assets/SuspensionLines.cs` | Draws lines between canopy and harness points |
+| `Assets/SuspensionLines.cs` | Draws lines between canopy and harness points — auto-detects canopy mesh center via Renderer bounds |
 | `Assets/CameraFollow.cs` | Smooth camera follow behaviour |
+| `Assets/DevColorize.cs` | **DEV ONLY** — attach to canopy/avatar to tint for visibility; remove before shipping |
+| `Assets/Editor/FixXsensMaterials.cs` | Editor tool: Tools → Fix Xsens Materials for URP — converts Standard→URP/Lit, run once |
 
 ### EOM_Solver.dll
 - Matlab-compiled native library for parachute equations of motion
@@ -155,14 +161,21 @@ These resolve automatically from `Packages/manifest.json` — no manual steps ne
 - XSens suit / Matlab stream is optional — avatar animates from XSens but the parachute physics are independent.
 - Never modify Anna's original Matlab scripts (`load_mvnx_and_animate.m`).
 
-### OPEN: Head tracking not working (2026-05-24)
-The app runs on Quest 2 and the scene is visible, but moving your head does not move the camera — the view is frozen.
+### RESOLVED: Head tracking (2026-05-26)
+Root cause: Unity 6 no longer auto-applies XR pose to a plain Main Camera.
+Fix: `VRCameraRig.cs` now manually reads `InputDevices.GetDeviceAtXRNode(XRNode.Head)` every `LateUpdate` and writes position/rotation to the camera transform. Uses `_sceneAnchor` (camera's initial world position) + HMD room-scale offset so the player stays in the right part of the world. Confirmed working on Quest 2.
 
-What was tried:
-1. Set `m_AutomaticLoading: 1` / `m_AutomaticRunning: 1` in `Assets/XR/XRGeneralSettingsPerBuildTarget.asset` — Oculus XR loader now auto-initializes on Android.
-2. Rewrote `VRCameraRig.cs` to use a coroutine (waits up to 5s for `XRSettings.isDeviceActive`) instead of checking on frame 1 — avoids the race condition where `CameraFollow` was never disabled.
+### RESOLVED: Parachute static on Android (2026-05-26)
+Root cause: `EOM_Solver.dll` is Windows x86-64 only — P/Invoke crashes silently on Android.
+Fix: `PlayerMovement.cs` `#else` branch now has a full pure-C# parachute aerodynamics model (gravity, drag, glide, toggle-driven turns from Quest trigger axes). State vector layout identical to EOM_Solver so the rest of the code (HUD, VelocityArrows, etc.) is unaffected.
 
-Neither fix resolved it. The scene uses a plain `Main Camera` GameObject — no XR Origin / XR Rig hierarchy. Next thing to try: **replace the Main Camera with a proper XR Origin prefab** (from `com.unity.xr.interaction.toolkit` or the `OVRCameraRig` from the Meta XR SDK). The current setup relies on the XR plugin driving a bare camera, which may not be supported in Unity 6.
+### RESOLVED: Avatar invisible on Quest (2026-05-26)
+Root cause: XSens sample materials used the Standard (built-in) shader, which is stripped on Android URP builds.
+Fix: Run **Tools → Fix Xsens Materials for URP** in the Editor (script at `Assets/Editor/FixXsensMaterials.cs`). Converts all materials under `Assets/Samples/Xsens` to `Universal Render Pipeline/Lit` and preserves albedo color.
+
+### RESOLVED: Suspension lines going wrong direction (2026-05-26)
+Root cause: `canopy` Transform reference pointed to root of Canopy_Rotated prefab (y≈0), not the visual mesh high above.
+Fix: `SuspensionLines.cs` now calls `GetComponentsInChildren<Renderer>()` and encapsulates their bounds to find the actual visual center, so any transform in the canopy hierarchy can be assigned — no need to hunt for the exact mesh child.
 
 ---
 

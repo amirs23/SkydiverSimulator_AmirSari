@@ -4,7 +4,9 @@ using System.Runtime.InteropServices;
 
 // Attach to any GameObject in the scene.
 // Drag the canopy and body Rigidbodies into the Inspector slots.
-// EOM_Solver.dll is Windows-only — on Mac/Quest the physics step is skipped (state held constant).
+// On Windows: calls EOM_Solver.dll (Matlab-compiled) every physics frame.
+// On Android/Quest: runs a simplified C# parachute model — gravity, drag,
+// glide, and toggle turns driven by Quest trigger buttons.
 public class PlayerMovement : MonoBehaviour
 {
     public Rigidbody rbCanopy;
@@ -25,9 +27,92 @@ public class PlayerMovement : MonoBehaviour
     private static void CallEOM(double t, double[] xCur, int[] xCurSize, double dt, double[] xNext, int[] xNextSize)
         => EOM_Solver_Native(t, xCur, xCurSize, dt, xNext, xNextSize);
 #else
-    // EOM_Solver.dll is Windows-only — pass state through unchanged on other platforms
+    // -----------------------------------------------------------------------
+    // Simplified parachute aerodynamics for Android (Quest 2).
+    // EOM_Solver.dll is Windows x86-64 only — this replaces it with a pure C#
+    // model so the HUD and physics-driven objects are animated on device.
+    //
+    // State vector layout (24 doubles, same as EOM_Solver contract):
+    //   [0-2]  CanopyPos    [3-5]  CanopyRot(Euler) [6-8]  CanopyLinVel
+    //   [9-11] CanopyAngVel [12-14]BodyPos          [15-17]BodyRot(Euler)
+    //   [18-20]BodyLinVel   [21-23]BodyAngVel
+    // -----------------------------------------------------------------------
+    private const float TerminalVY  = -5f;      // m/s descent at terminal velocity
+    private const float GlideRatio  = 2.5f;     // horizontal / vertical speed
+    private const float KDrag       = 9.81f / 5f; // drag coefficient
+    private const float TurnRateDeg = 30f;      // deg/s per unit of net toggle (−1..+1)
+    private const float BodyOffsetY = -8f;      // body hangs 8 m below canopy
+
+    private static UnityEngine.XR.InputDevice s_rightCtrl;
+    private static UnityEngine.XR.InputDevice s_leftCtrl;
+
+    private static float GetTrigger(UnityEngine.XR.XRNode node, ref UnityEngine.XR.InputDevice dev)
+    {
+        if (!dev.isValid)
+            dev = UnityEngine.XR.InputDevices.GetDeviceAtXRNode(node);
+        dev.TryGetFeatureValue(UnityEngine.XR.CommonUsages.trigger, out float v);
+        return v;
+    }
+
     private static void CallEOM(double t, double[] xCur, int[] xCurSize, double dt, double[] xNext, int[] xNextSize)
-        => System.Array.Copy(xCur, xNext, xCur.Length);
+    {
+        System.Array.Copy(xCur, xNext, xCur.Length);
+
+        float dT = (float)dt;
+
+        // --- Read inputs ---
+        float rightToggle = GetTrigger(UnityEngine.XR.XRNode.RightHand, ref s_rightCtrl);
+        float leftToggle  = GetTrigger(UnityEngine.XR.XRNode.LeftHand,  ref s_leftCtrl);
+        if (Keyboard.current != null)
+        {
+            if (Keyboard.current.dKey.isPressed) rightToggle = Mathf.Max(rightToggle, 1f);
+            if (Keyboard.current.aKey.isPressed) leftToggle  = Mathf.Max(leftToggle,  1f);
+        }
+
+        // --- Unpack canopy state ---
+        float px = (float)xNext[0], py = (float)xNext[1], pz = (float)xNext[2];
+        float ry = (float)xNext[4];   // yaw (heading), degrees
+        float vx = (float)xNext[6], vy = (float)xNext[7], vz = (float)xNext[8];
+
+        // --- Heading update from toggle differential ---
+        float netToggle = rightToggle - leftToggle;   // negative = turn left
+        ry += netToggle * TurnRateDeg * dT;
+        ry  = ((ry % 360f) + 360f) % 360f;
+
+        // --- Target velocity: glide forward + descend ---
+        float headRad = ry * Mathf.Deg2Rad;
+        float fwd     = -TerminalVY * GlideRatio;     // always positive
+        float desVx   = Mathf.Sin(headRad) * fwd;
+        float desVy   = TerminalVY;
+        float desVz   = Mathf.Cos(headRad) * fwd;
+
+        // Exponential velocity relaxation toward target (simulates drag)
+        float alpha = 1f - Mathf.Exp(-KDrag * dT);
+        vx = Mathf.Lerp(vx, desVx, alpha);
+        vy = Mathf.Lerp(vy, desVy, alpha);
+        vz = Mathf.Lerp(vz, desVz, alpha);
+
+        // --- Integrate position ---
+        px += vx * dT;
+        py += vy * dT;
+        pz += vz * dT;
+
+        // --- Write canopy back ---
+        xNext[0] = px; xNext[1] = py;  xNext[2] = pz;
+        // xNext[3] and xNext[5] (pitch / roll) unchanged
+        xNext[4] = ry;
+        xNext[6] = vx; xNext[7] = vy;  xNext[8] = vz;
+        xNext[9] = 0;  xNext[10] = 0;  xNext[11] = 0;
+
+        // --- Body: rigid attachment 8 m below canopy ---
+        xNext[12] = px; xNext[13] = py + BodyOffsetY; xNext[14] = pz;
+        // copy canopy rotation to body
+        xNext[15] = xNext[3]; xNext[16] = ry; xNext[17] = xNext[5];
+        xNext[18] = vx; xNext[19] = vy; xNext[20] = vz;
+        xNext[21] = 0;  xNext[22] = 0;  xNext[23] = 0;
+
+        xNextSize[0] = 24;
+    }
 #endif
 
     private State currentState = new State();
@@ -73,6 +158,8 @@ public class PlayerMovement : MonoBehaviour
         return next;
     }
 
+    // Returns [rightToggle, leftToggle, lookUp, lookDown, lookRight, lookLeft]
+    // (kept for API compatibility — CallEOM reads input directly on Android)
     public double[] GetUserInput()
     {
         double delteRight = 0, delteLeft = 0;
@@ -103,14 +190,14 @@ public class PlayerMovement : MonoBehaviour
             if (rbCanopy != null)
             {
                 CanopyPos    = rbCanopy.position;
-                CanopyRot    = rbCanopy.rotation.eulerAngles; // was: quaternion components (bug)
+                CanopyRot    = rbCanopy.rotation.eulerAngles;
                 CanopyLinVel = rbCanopy.linearVelocity;
                 CanopyAngVel = rbCanopy.angularVelocity;
             }
             if (rbBody != null)
             {
                 BodyPos    = rbBody.position;
-                BodyRot    = rbBody.rotation.eulerAngles;     // was: quaternion components (bug)
+                BodyRot    = rbBody.rotation.eulerAngles;
                 BodyLinVel = rbBody.linearVelocity;
                 BodyAngVel = rbBody.angularVelocity;
             }
