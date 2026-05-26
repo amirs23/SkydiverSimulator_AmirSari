@@ -20,9 +20,15 @@ public class VRCameraRig : MonoBehaviour
     [Tooltip("The CameraFollow component on this camera — will be disabled in VR mode")]
     public CameraFollow cameraFollow;
 
+    [Tooltip("Canopy or Avatar transform — camera rides with this object in VR")]
+    public Transform followTarget;
+
+    [Tooltip("Offset from followTarget (e.g. eye level under canopy)")]
+    public Vector3 followOffset = new Vector3(0f, -2f, 0f);
+
     private bool _vrMode = false;
     private InputDevice _hmd;
-    private Vector3 _sceneAnchor;   // camera's starting world position
+    private Vector3 _sceneAnchor;
 
     void Start()
     {
@@ -65,7 +71,11 @@ public class VRCameraRig : MonoBehaviour
         if (!_hmd.isValid)
             _hmd = InputDevices.GetDeviceAtXRNode(XRNode.Head);
 
-        // Position: scene anchor + HMD's room-scale offset
+        // Anchor follows the canopy/avatar so the player rides with the physics
+        if (followTarget != null)
+            _sceneAnchor = followTarget.position + followOffset;
+
+        // Position: moving anchor + HMD's room-scale offset
         if (_hmd.TryGetFeatureValue(CommonUsages.devicePosition, out Vector3 pos))
             transform.position = _sceneAnchor + pos;
 

@@ -13,7 +13,7 @@ public class PlayerMovement : MonoBehaviour
     public Rigidbody rbBody;
     public Transform playerTransform;
 
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+#if UNITY_STANDALONE_WIN && !UNITY_EDITOR
     [DllImport("EOM_Solver")]
     private static extern void EOM_Solver_Native(
         double tCurrent,
@@ -120,8 +120,18 @@ public class PlayerMovement : MonoBehaviour
 
     void Start()
     {
-        if (rbCanopy != null) rbCanopy.useGravity = false;
-        if (rbBody   != null) rbBody.useGravity   = false;
+        if (rbCanopy != null)
+        {
+            rbCanopy.useGravity = false;
+            if (rbCanopy.position.y < 10f)
+                rbCanopy.position = new Vector3(rbCanopy.position.x, 50f, rbCanopy.position.z);
+        }
+        if (rbBody != null)
+        {
+            rbBody.useGravity = false;
+            if (rbBody.position.y < 10f)
+                rbBody.position = new Vector3(rbBody.position.x, 42f, rbBody.position.z);
+        }
         Debug.Log("PlayerMovement ready. Platform: " + Application.platform);
         currentState.RbToState(rbCanopy, rbBody);
     }
