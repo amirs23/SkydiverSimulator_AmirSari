@@ -287,6 +287,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRCameraRig
   cameraFollow: {fileID: 338867162}
+  followTarget: {fileID: 1782691932}
+  followOffset: {x: 0, y: 2, z: -10}
 --- !u!114 &338867164
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -625,6 +627,53 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 1746841bed5d94189911042bd6527306, type: 3}
   m_PrefabInstance: {fileID: 1845585579}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1630716711
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1630716713}
+  - component: {fileID: 1630716712}
+  m_Layer: 0
+  m_Name: PhysicsController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1630716712
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1630716711}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 221bc71c4387e4b178aefa4dce097245, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
+  rbCanopy: {fileID: 2058625382}
+  rbBody: {fileID: 1782691935}
+  playerTransform: {fileID: 0}
+--- !u!4 &1630716713
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1630716711}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.72986, y: 0, z: -7.54566}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &1765700443 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3806027505601273513, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
@@ -779,6 +828,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1782691933}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1782691934}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1782691935}
   m_SourcePrefab: {fileID: 100100000, guid: cf5dffaee6fe943409b00814ae815bd6, type: 3}
 --- !u!1 &1782691929 stripped
 GameObject:
@@ -854,6 +909,46 @@ MonoBehaviour:
   rightShoulder: {fileID: 629398628}
   lineWidth: 0.02
   canopySpread: 0.8
+--- !u!114 &1782691934
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1782691929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa216faabba4ad14d838e3eae3f37999, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DevColorize
+  color: {r: 0.8742138, g: 0.14020397, b: 0.20142828, a: 1}
+--- !u!54 &1782691935
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1782691929}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!1 &1840702919
 GameObject:
   m_ObjectHideFlags: 0
@@ -1044,6 +1139,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 1746841bed5d94189911042bd6527306, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2058625382}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 1746841bed5d94189911042bd6527306, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2058625383}
   m_SourcePrefab: {fileID: 100100000, guid: 1746841bed5d94189911042bd6527306, type: 3}
 --- !u!1 &1962253792
 GameObject:
@@ -1175,6 +1273,19 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &2058625383
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2058625381}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa216faabba4ad14d838e3eae3f37999, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DevColorize
+  color: {r: 0, g: 1, b: 1, a: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1188,3 +1299,4 @@ SceneRoots:
   - {fileID: 1169167586}
   - {fileID: 1962253794}
   - {fileID: 1992351940}
+  - {fileID: 1630716713}

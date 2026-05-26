@@ -53,8 +53,10 @@ public class WindEffect : MonoBehaviour
             ref Particle p = ref _particles[i];
             p.age += dt;
 
-            // Drift upward in world space (relative to avatar = simulates avatar falling down)
-            p.localOffset += Vector3.up * driftSpeed * dt;
+            // Drift opposite to direction of travel: up (descent) + backward past the face (glide)
+            Vector3 fwd = (followTarget != null) ? followTarget.forward : Vector3.forward;
+            Vector3 drift = (Vector3.up * 0.5f + (-fwd) * 1f).normalized * driftSpeed;
+            p.localOffset += drift * dt;
 
             p.go.transform.position = center + p.localOffset;
 
@@ -77,8 +79,10 @@ public class WindEffect : MonoBehaviour
 
         // Random point on a sphere shell
         Vector3 offset = Random.onUnitSphere * spawnRadius;
-        // Bias spawn points upward so they drift through the avatar's view
-        offset.y = Mathf.Abs(offset.y) * -1f; // start below, drift up and past
+        // Bias to spawn below and in front — particles then drift up and backward past the avatar
+        Vector3 fwd = followTarget != null ? followTarget.forward : Vector3.forward;
+        offset.y = -Mathf.Abs(offset.y);  // below
+        if (Vector3.Dot(offset, fwd) < 0) offset -= 2f * Vector3.Project(offset, fwd); // flip to front hemisphere
 
         float scale = Random.Range(0.08f, 0.22f);
         var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);

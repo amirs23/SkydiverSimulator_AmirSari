@@ -41,7 +41,7 @@ public class PlayerMovement : MonoBehaviour
     private const float GlideRatio  = 2.5f;     // horizontal / vertical speed
     private const float KDrag       = 9.81f / 5f; // drag coefficient
     private const float TurnRateDeg = 30f;      // deg/s per unit of net toggle (−1..+1)
-    private const float BodyOffsetY = -8f;      // body hangs 8 m below canopy
+    private const float BodyOffsetY = -5f;      // body hangs 5 m below canopy
 
     private static UnityEngine.XR.InputDevice s_rightCtrl;
     private static UnityEngine.XR.InputDevice s_leftCtrl;
@@ -117,6 +117,10 @@ public class PlayerMovement : MonoBehaviour
 
     private State currentState = new State();
     private State nextState    = new State();
+    private bool  _landed      = false;
+    private bool  _aWasDown    = false;
+    private Vector3 _initCanopyPos;
+    private Vector3 _initBodyPos;
 
     void Start()
     {
@@ -124,24 +128,99 @@ public class PlayerMovement : MonoBehaviour
         {
             rbCanopy.useGravity = false;
             if (rbCanopy.position.y < 10f)
-                rbCanopy.position = new Vector3(rbCanopy.position.x, 50f, rbCanopy.position.z);
+                rbCanopy.position = new Vector3(rbCanopy.position.x, 75f, rbCanopy.position.z);
         }
         if (rbBody != null)
         {
             rbBody.useGravity = false;
             if (rbBody.position.y < 10f)
-                rbBody.position = new Vector3(rbBody.position.x, 42f, rbBody.position.z);
+                rbBody.position = new Vector3(rbBody.position.x, 70f, rbBody.position.z);
         }
+
+        // Auto-position landing zone using actual canopy heading.
+        // Body hits ground when canopy.y = 5 (body is 5m below canopy),
+        // so effective descent = start.y - 5. Forward dist = GlideRatio * effectiveHeight.
+        if (rbCanopy != null)
+        {
+            Vector3 start           = rbCanopy.position;
+            float   effectiveHeight = start.y - 5f;        // canopy stops at y=5, not y=0
+            float   forwardDist     = 2.5f * effectiveHeight;
+            float   headingRad  = rbCanopy.rotation.eulerAngles.y * Mathf.Deg2Rad;
+            Vector3 landingPos  = new Vector3(
+                start.x + Mathf.Sin(headingRad) * forwardDist,
+                0f,
+                start.z + Mathf.Cos(headingRad) * forwardDist
+            );
+            LandingZoneMarker marker = FindFirstObjectByType<LandingZoneMarker>();
+            if (marker != null)
+            {
+                marker.transform.position = landingPos;
+                Debug.Log($"[PlayerMovement] Landing zone placed at {landingPos}, heading {rbCanopy.rotation.eulerAngles.y:F1}°");
+            }
+        }
+
+        // Store starting positions for restart
+        _initCanopyPos = rbCanopy != null ? rbCanopy.position : Vector3.zero;
+        _initBodyPos   = rbBody   != null ? rbBody.position   : Vector3.zero;
+
         Debug.Log("PlayerMovement ready. Platform: " + Application.platform);
         currentState.RbToState(rbCanopy, rbBody);
+    }
+
+    void Update()
+    {
+        bool triggered = false;
+
+        // Keyboard: R key (Editor)
+        if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
+            triggered = true;
+
+        // Quest: A button on right controller (edge detect)
+        var rightCtrl = UnityEngine.XR.InputDevices.GetDeviceAtXRNode(UnityEngine.XR.XRNode.RightHand);
+        if (rightCtrl.isValid)
+        {
+            rightCtrl.TryGetFeatureValue(UnityEngine.XR.CommonUsages.primaryButton, out bool aDown);
+            if (aDown && !_aWasDown) triggered = true;
+            _aWasDown = aDown;
+        }
+
+        if (triggered) Restart();
+    }
+
+    void Restart()
+    {
+        _landed = false;
+        rbCanopy.position        = _initCanopyPos;
+        rbBody.position          = _initBodyPos;
+        rbCanopy.linearVelocity  = Vector3.zero;
+        rbCanopy.angularVelocity = Vector3.zero;
+        rbBody.linearVelocity    = Vector3.zero;
+        rbBody.angularVelocity   = Vector3.zero;
+        currentState.RbToState(rbCanopy, rbBody);
+        Debug.Log("[PlayerMovement] Restarted.");
     }
 
     void FixedUpdate()
     {
         if (rbCanopy == null || rbBody == null) return;
+        if (_landed) return;
 
         currentState.RbToState(rbCanopy, rbBody);
         nextState = GetNextStepState(currentState);
+
+        // Body hits ground → freeze everything
+        if (nextState.BodyPos.y <= 0f)
+        {
+            _landed = true;
+            rbCanopy.MovePosition(new Vector3(nextState.CanopyPos.x, 5f,  nextState.CanopyPos.z));
+            rbBody.MovePosition(  new Vector3(nextState.BodyPos.x,   0f,  nextState.BodyPos.z));
+            rbCanopy.linearVelocity  = Vector3.zero;
+            rbCanopy.angularVelocity = Vector3.zero;
+            rbBody.linearVelocity    = Vector3.zero;
+            rbBody.angularVelocity   = Vector3.zero;
+            Debug.Log("[PlayerMovement] Landed!");
+            return;
+        }
 
         rbCanopy.MovePosition(nextState.CanopyPos);
         rbBody.MovePosition(nextState.BodyPos);

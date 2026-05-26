@@ -1,5 +1,5 @@
 # HANDOFF — SkydiverSimulator (VR Parachute, Quest 2)
-**Last updated: 2026-05-26**
+**Last updated: 2026-05-26 (session 2)**
 
 ---
 
@@ -42,6 +42,13 @@ git pull
 | Avatar materials visible on Quest | ✓ fixed 2026-05-26 — all XSens mats converted to URP/Lit |
 | Suspension lines connect to canopy | ✓ fixed 2026-05-26 — auto-finds mesh bounds, no manual transform needed |
 | Dev color scheme (lines/canopy/avatar) | ✓ added 2026-05-26 — DevColorize.cs, lines yellow |
+| Android parachute physics — Quest triggers steer | ✓ confirmed working on device 2026-05-26 |
+| VR camera follows canopy/avatar in flight | ✓ fixed 2026-05-26 — followTarget on VRCameraRig |
+| Canopy + avatar start at correct height (75m/70m) | ✓ fixed 2026-05-26 — auto-lift in PlayerMovement.Start() |
+| Landing zone auto-positioned at predicted landing spot | ✓ fixed 2026-05-26 — uses actual heading + effective height |
+| Avatar + canopy freeze on landing | ✓ fixed 2026-05-26 — _landed flag in PlayerMovement |
+| Restart mid-flight or after landing | ✓ added 2026-05-26 — A button (Quest) / R key (Editor) |
+| Wind particles follow direction of travel | ✓ fixed 2026-05-26 — combined up + backward drift in WindEffect |
 
 ---
 
@@ -172,6 +179,18 @@ Fix: `PlayerMovement.cs` `#else` branch now has a full pure-C# parachute aerodyn
 ### RESOLVED: Avatar invisible on Quest (2026-05-26)
 Root cause: XSens sample materials used the Standard (built-in) shader, which is stripped on Android URP builds.
 Fix: Run **Tools → Fix Xsens Materials for URP** in the Editor (script at `Assets/Editor/FixXsensMaterials.cs`). Converts all materials under `Assets/Samples/Xsens` to `Universal Render Pipeline/Lit` and preserves albedo color.
+
+---
+
+## Pending tasks (next session)
+
+| Task | Notes |
+|------|-------|
+| Brake / flare control | Both triggers together = slow descent. Add visual feedback (e.g. colour or size change) showing how much toggle is pulled |
+| Environment visuals | Grass texture on ground plane, sky-blue skybox, replace SkyGrid spheres with white cloud meshes |
+| Canopy position + suspension line fix | Canopy should be slightly forward and tilted (filled with air), not directly above avatar. Suspension lines currently attach at avatar's sides — should attach at front harness points |
+
+---
 
 ### RESOLVED: Suspension lines going wrong direction (2026-05-26)
 Root cause: `canopy` Transform reference pointed to root of Canopy_Rotated prefab (y≈0), not the visual mesh high above.
