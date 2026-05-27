@@ -13,6 +13,9 @@ public class PlayerMovement : MonoBehaviour
     public Rigidbody rbBody;
     public Transform playerTransform;
 
+    // Read by SkydiverHUD to show brake level on the HUD (0=no brake, 1=full flare).
+    public static float BrakeLevel { get; private set; }
+
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
     [DllImport("EOM_Solver")]
     private static extern void EOM_Solver_Native(
@@ -67,7 +70,22 @@ public class PlayerMovement : MonoBehaviour
         {
             if (Keyboard.current.dKey.isPressed) rightToggle = Mathf.Max(rightToggle, 1f);
             if (Keyboard.current.aKey.isPressed) leftToggle  = Mathf.Max(leftToggle,  1f);
+            // Space = symmetric brake / flare (keyboard testing)
+            if (Keyboard.current.spaceKey.isPressed)
+            {
+                rightToggle = Mathf.Max(rightToggle, 1f);
+                leftToggle  = Mathf.Max(leftToggle,  1f);
+            }
         }
+
+        // Brake level = symmetric portion of both toggles (0 = no brake, 1 = full flare).
+        // Differential portion still drives turning.
+        float brakeLevel = Mathf.Min(rightToggle, leftToggle);
+        BrakeLevel = brakeLevel;
+
+        // Remove the symmetric brake component before computing turning.
+        float rightTurn = rightToggle - brakeLevel;
+        float leftTurn  = leftToggle  - brakeLevel;
 
         // --- Unpack canopy state ---
         float px = (float)xNext[0], py = (float)xNext[1], pz = (float)xNext[2];
@@ -75,15 +93,20 @@ public class PlayerMovement : MonoBehaviour
         float vx = (float)xNext[6], vy = (float)xNext[7], vz = (float)xNext[8];
 
         // --- Heading update from toggle differential ---
-        float netToggle = rightToggle - leftToggle;   // negative = turn left
+        float netToggle = rightTurn - leftTurn;   // negative = turn left
         ry += netToggle * TurnRateDeg * dT;
         ry  = ((ry % 360f) + 360f) % 360f;
 
+        // --- Brake / flare effect on descent and glide ---
+        // Full brake (brakeLevel=1): descent rate drops to ~0.3 m/s, forward speed ~0.3× normal.
+        float effectiveTerminalVY = Mathf.Lerp(TerminalVY, -0.3f, brakeLevel);
+        float effectiveGlide      = Mathf.Lerp(GlideRatio,  0.3f, brakeLevel);
+
         // --- Target velocity: glide forward + descend ---
         float headRad = ry * Mathf.Deg2Rad;
-        float fwd     = -TerminalVY * GlideRatio;     // always positive
+        float fwd     = -effectiveTerminalVY * effectiveGlide;    // always positive
         float desVx   = Mathf.Sin(headRad) * fwd;
-        float desVy   = TerminalVY;
+        float desVy   = effectiveTerminalVY;
         float desVz   = Mathf.Cos(headRad) * fwd;
 
         // Exponential velocity relaxation toward target (simulates drag)

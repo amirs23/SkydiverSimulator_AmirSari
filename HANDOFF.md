@@ -1,5 +1,5 @@
 # HANDOFF — SkydiverSimulator (VR Parachute, Quest 2)
-**Last updated: 2026-05-26 (session 2)**
+**Last updated: 2026-05-27 (Amir)**
 
 ---
 
@@ -182,11 +182,17 @@ Fix: Run **Tools → Fix Xsens Materials for URP** in the Editor (script at `Ass
 
 ---
 
+## Completed since last session (2026-05-27, Amir)
+
+| Task | Notes |
+|------|-------|
+| Brake / flare control | ✓ Done. Both triggers symmetric = braking. `BrakeLevel` static float (0–1) set each frame. Full brake: descent 0.3 m/s (was 5 m/s), glide 0.3× normal. Space bar = brake in Editor. |
+| BRK indicator in HUD | ✓ Done. `SkydiverHUD` 4th line shows `BRK  XX%` when > 1%, color yellow→red. Only visible when braking. |
+
 ## Pending tasks (next session)
 
 | Task | Notes |
 |------|-------|
-| Brake / flare control | Both triggers together = slow descent. Add visual feedback (e.g. colour or size change) showing how much toggle is pulled |
 | Environment visuals | Grass texture on ground plane, sky-blue skybox, replace SkyGrid spheres with white cloud meshes |
 | Canopy position + suspension line fix | Canopy should be slightly forward and tilted (filled with air), not directly above avatar. Suspension lines currently attach at avatar's sides — should attach at front harness points |
 

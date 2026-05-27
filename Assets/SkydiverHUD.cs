@@ -9,7 +9,7 @@ public class SkydiverHUD : MonoBehaviour
     [Tooltip("The canopy Rigidbody — source of altitude, speed, and heading data")]
     public Rigidbody canopyRigidbody;
 
-    TextMeshProUGUI _altText, _spdText, _hdgText;
+    TextMeshProUGUI _altText, _spdText, _hdgText, _brkText;
 
     void Awake()
     {
@@ -30,11 +30,12 @@ public class SkydiverHUD : MonoBehaviour
         canvas.renderMode = RenderMode.WorldSpace;
 
         var rt = canvasGO.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(500, 180);
+        rt.sizeDelta = new Vector2(500, 240);
 
-        _altText = MakeLabel(canvasGO.transform, new Vector2(0f,  60f));
-        _spdText = MakeLabel(canvasGO.transform, new Vector2(0f,   0f));
-        _hdgText = MakeLabel(canvasGO.transform, new Vector2(0f, -60f));
+        _altText = MakeLabel(canvasGO.transform, new Vector2(0f,  90f));
+        _spdText = MakeLabel(canvasGO.transform, new Vector2(0f,  30f));
+        _hdgText = MakeLabel(canvasGO.transform, new Vector2(0f, -30f));
+        _brkText = MakeLabel(canvasGO.transform, new Vector2(0f, -90f));
 
         Refresh(0f, 0f, 0f);
     }
@@ -71,13 +72,25 @@ public class SkydiverHUD : MonoBehaviour
         float hdg = Mathf.Atan2(vel.x, vel.z) * Mathf.Rad2Deg;
         if (hdg < 0f) hdg += 360f;
 
-        Refresh(alt, spd, hdg);
+        float brk = PlayerMovement.BrakeLevel * 100f;
+        Refresh(alt, spd, hdg, brk);
     }
 
-    void Refresh(float alt, float spd, float hdg)
+    void Refresh(float alt, float spd, float hdg, float brkPct = 0f)
     {
         _altText.text = $"ALT   {alt:F0} m";
         _spdText.text = $"SPD   {spd:F1} km/h";
         _hdgText.text = $"HDG   {(int)hdg:D3}°";
+
+        if (brkPct > 1f)
+        {
+            _brkText.text  = $"BRK   {brkPct:F0}%";
+            _brkText.color = Color.Lerp(Color.yellow, Color.red, brkPct / 100f);
+        }
+        else
+        {
+            _brkText.text  = "";
+            _brkText.color = Color.white;
+        }
     }
 }
