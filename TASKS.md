@@ -32,6 +32,8 @@
 | Landing zone marker | Amir (2026-05-19) | LandingZoneMarker.cs — pulsing orange bullseye (2 rings + crosshair) drawn with LineRenderers. Place GameObject on the ground at the target spot. |
 | Scene wired up and verified on Mac | Amir (2026-05-20) | WindEffect (Avatar wired), LandingZoneMarker (at X:20 Z:20), VelocityArrows (canopy Rigidbody slot empty — activates when EOM_Solver runs on Windows) added to Integration_Ready.unity. XR packages conflict fixed (removed com.unity.xr.oculus — Sari must re-add on Windows build machine). Apply Root Motion unchecked on Avatar Animator. Scene verified: avatar animates, suspension lines connected, HUD working, wind particles visible, landing zone pulsing. |
 | Destination arrow (nav indicator) | Sari (2026-05-31) | DestinationArrow.cs — arrow floats in front of avatar, points toward a draggable destination target. All fields Inspector-configurable: avatar ref, destination ref, local offset (position on avatar), shaft length, line width, head fraction, color. Add empty GameObject → Add Component → DestinationArrow → drag Avatar + destination target. |
+| Grass ground | Sari (2026-05-31) | GrassGround.cs — attach to Plane. Auto-scales plane to 2000x, applies green URP/Lit material, sets skybox ground color for horizon blend. |
+| Cloud layer (SkyGrid rewrite) | Sari (2026-05-31) | SkyGrid.cs rewritten — fluffy puff-sphere cloud clusters, fixed Y altitude, follows avatar in XZ. Avatar start height raised to 500m. |
 
 ---
 
@@ -84,6 +86,7 @@ git push
 | EOM_Solver.dll is Windows-only, can't test physics on Mac | Amir | Open — test at lab |
 | Canopy mesh pivot is off-center (not at geometric center) | Amir | Workaround: use X offset in local position |
 | com.unity.xr.oculus removed from manifest — was incompatible with Unity 6 on Mac | Amir (2026-05-20) | Sari: re-add on Windows build machine using a Unity 6-compatible version (try com.unity.xr.oculus 4.3.0+) or switch to Meta XR SDK |
+| Horizon color mismatch | Sari (2026-05-31) | Grass plane and skybox ground are slightly different greens due to skybox exposure (1.3×). GrassGround.cs has two separate color fields to tweak. Needs a proper fix. |
 
 ## Note for Sari's AI — next session
 

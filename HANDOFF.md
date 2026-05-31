@@ -188,6 +188,8 @@ Fix: Run **Tools → Fix Xsens Materials for URP** in the Editor (script at `Ass
 | Task | Notes |
 |------|-------|
 | Destination arrow | ✓ Done. `DestinationArrow.cs` — arrow floats in front of avatar (crotch/chest area, configurable via Local Offset), always points horizontally toward destination. Drag any GameObject into the Destination slot in Inspector to change target. Fields: avatar, destination, localOffset, shaftLength, lineWidth, headFraction, arrowColor. |
+| Grass ground | ✓ Done. `GrassGround.cs` — attach to Plane, auto-scales it to 2000x and applies URP/Lit green material. Also sets skybox ground color to blend at horizon. Two color fields: Grass Color (plane) and Skybox Ground Color (horizon). |
+| Cloud layer (SkyGrid rewrite) | ✓ Done. `SkyGrid.cs` rewritten — fluffy white cloud clusters built from puff-spheres, no prefab needed. Grid follows avatar in XZ but stays at fixed Y (Cloud Height), so you descend through the layer. All fields Inspector-configurable. Avatar start height raised to 500m. |
 
 ---
 
@@ -202,7 +204,7 @@ Fix: Run **Tools → Fix Xsens Materials for URP** in the Editor (script at `Ass
 
 | Task | Notes |
 |------|-------|
-| Environment visuals | Grass texture on ground plane, sky-blue skybox, replace SkyGrid spheres with white cloud meshes |
+| Horizon color mismatch | Grass plane green and skybox ground green are slightly different shades due to skybox exposure (1.3×). Two separate color fields exist in GrassGround.cs (Grass Color + Skybox Ground Color) — needs fine-tuning or a better approach. |
 | Canopy position + suspension line fix | Canopy should be slightly forward and tilted (filled with air), not directly above avatar. Suspension lines currently attach at avatar's sides — should attach at front harness points |
 
 ---

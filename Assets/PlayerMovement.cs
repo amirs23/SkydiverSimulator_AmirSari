@@ -151,13 +151,13 @@ public class PlayerMovement : MonoBehaviour
         {
             rbCanopy.useGravity = false;
             if (rbCanopy.position.y < 10f)
-                rbCanopy.position = new Vector3(rbCanopy.position.x, 75f, rbCanopy.position.z);
+                rbCanopy.position = new Vector3(rbCanopy.position.x, 500f, rbCanopy.position.z);
         }
         if (rbBody != null)
         {
             rbBody.useGravity = false;
             if (rbBody.position.y < 10f)
-                rbBody.position = new Vector3(rbBody.position.x, 70f, rbBody.position.z);
+                rbBody.position = new Vector3(rbBody.position.x, 495f, rbBody.position.z);
         }
 
         // Auto-position landing zone using actual canopy heading.
