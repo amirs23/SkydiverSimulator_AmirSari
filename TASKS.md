@@ -1,5 +1,5 @@
 # TASKS — SkydiverSimulator
-**Last updated: 2026-05-20 (Amir) — scene verified working, all scripts live in Integration_Ready.unity**
+**Last updated: 2026-05-31 (Sari) — DestinationArrow added**
 **Amir's AI**: Claude (claude-sonnet-4-6)
 **Sari's AI**: Claude (claude-sonnet-4-6)
 
@@ -31,6 +31,7 @@
 | Wind/environment effects | Amir (2026-05-19) | WindEffect.cs — 60 cloud-sphere particles drift upward past the avatar giving sense of descent. Attach to scene, drag Avatar in Inspector. |
 | Landing zone marker | Amir (2026-05-19) | LandingZoneMarker.cs — pulsing orange bullseye (2 rings + crosshair) drawn with LineRenderers. Place GameObject on the ground at the target spot. |
 | Scene wired up and verified on Mac | Amir (2026-05-20) | WindEffect (Avatar wired), LandingZoneMarker (at X:20 Z:20), VelocityArrows (canopy Rigidbody slot empty — activates when EOM_Solver runs on Windows) added to Integration_Ready.unity. XR packages conflict fixed (removed com.unity.xr.oculus — Sari must re-add on Windows build machine). Apply Root Motion unchecked on Avatar Animator. Scene verified: avatar animates, suspension lines connected, HUD working, wind particles visible, landing zone pulsing. |
+| Destination arrow (nav indicator) | Sari (2026-05-31) | DestinationArrow.cs — arrow floats in front of avatar, points toward a draggable destination target. All fields Inspector-configurable: avatar ref, destination ref, local offset (position on avatar), shaft length, line width, head fraction, color. Add empty GameObject → Add Component → DestinationArrow → drag Avatar + destination target. |
 
 ---
 

@@ -1,5 +1,5 @@
 # HANDOFF — SkydiverSimulator (VR Parachute, Quest 2)
-**Last updated: 2026-05-27 (Amir)**
+**Last updated: 2026-05-31 (Sari)**
 
 ---
 
@@ -49,6 +49,7 @@ git pull
 | Avatar + canopy freeze on landing | ✓ fixed 2026-05-26 — _landed flag in PlayerMovement |
 | Restart mid-flight or after landing | ✓ added 2026-05-26 — A button (Quest) / R key (Editor) |
 | Wind particles follow direction of travel | ✓ fixed 2026-05-26 — combined up + backward drift in WindEffect |
+| Destination arrow (nav indicator) | ✓ added 2026-05-31 — DestinationArrow.cs, floats in front of avatar, points at draggable target |
 
 ---
 
@@ -179,6 +180,14 @@ Fix: `PlayerMovement.cs` `#else` branch now has a full pure-C# parachute aerodyn
 ### RESOLVED: Avatar invisible on Quest (2026-05-26)
 Root cause: XSens sample materials used the Standard (built-in) shader, which is stripped on Android URP builds.
 Fix: Run **Tools → Fix Xsens Materials for URP** in the Editor (script at `Assets/Editor/FixXsensMaterials.cs`). Converts all materials under `Assets/Samples/Xsens` to `Universal Render Pipeline/Lit` and preserves albedo color.
+
+---
+
+## Completed since last session (2026-05-31, Sari)
+
+| Task | Notes |
+|------|-------|
+| Destination arrow | ✓ Done. `DestinationArrow.cs` — arrow floats in front of avatar (crotch/chest area, configurable via Local Offset), always points horizontally toward destination. Drag any GameObject into the Destination slot in Inspector to change target. Fields: avatar, destination, localOffset, shaftLength, lineWidth, headFraction, arrowColor. |
 
 ---
 
