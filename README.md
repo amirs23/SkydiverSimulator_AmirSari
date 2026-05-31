@@ -8,10 +8,10 @@
 
 We are building **two Unity simulation projects** for a skydiving simulator:
 
-### Project 1 — AR Freefall (NOT STARTED YET)
+### Project 1 — AR Freefall → [SariMorkos/SkydiverAR](https://github.com/SariMorkos/SkydiverAR.git)
 - Skydiver in **free fall** (before parachute opens)
 - Uses **XREAL Air2 Ultra** AR goggles
-- Needs a completely new Unity project
+- Separate Unity project — see repo above
 - Will use XSens motion capture to animate the skydiver body
 
 ### Project 2 — VR Parachute Simulator (THIS REPO — IN PROGRESS)
