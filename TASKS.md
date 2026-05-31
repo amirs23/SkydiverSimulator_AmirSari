@@ -41,11 +41,11 @@
 
 *(none)*
 
----
-
 ## To Do — Project 2 (VR Parachute)
 
-*(All tasks complete — see Completed section above)*
+| Task | Assigned to | Priority | Notes |
+|------|-------------|----------|-------|
+| Assign SkyboxGrass material in Unity | Sari | LOW | Window → Rendering → Lighting → Skybox Material → drag in Assets/Materials/SkyboxGrass.mat. Fixes horizon color mismatch. |
 
 ---
 
