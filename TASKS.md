@@ -86,7 +86,7 @@ git push
 | EOM_Solver.dll is Windows-only, can't test physics on Mac | Amir | Open — test at lab |
 | Canopy mesh pivot is off-center (not at geometric center) | Amir | Workaround: use X offset in local position |
 | com.unity.xr.oculus removed from manifest — was incompatible with Unity 6 on Mac | Amir (2026-05-20) | Sari: re-add on Windows build machine using a Unity 6-compatible version (try com.unity.xr.oculus 4.3.0+) or switch to Meta XR SDK |
-| Horizon color mismatch | Sari (2026-05-31) | Grass plane and skybox ground are slightly different greens due to skybox exposure (1.3×). GrassGround.cs has two separate color fields to tweak. Needs a proper fix. |
+| Horizon color mismatch | Sari (2026-05-31) | FIXED. Created Assets/Materials/SkyboxGrass.mat with _GroundColor baked in. Assign it in Window → Rendering → Lighting → Skybox Material. Runtime hack removed from GrassGround.cs. |
 
 ## Note for Sari's AI — next session
 

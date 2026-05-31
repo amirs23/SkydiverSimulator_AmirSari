@@ -8,8 +8,6 @@ public class GrassGround : MonoBehaviour
     [Tooltip("Base grass colour — applied to the ground plane")]
     public Color grassColor = new Color(0.18f, 0.42f, 0.12f);
 
-    [Tooltip("Skybox ground colour — tweak this separately to match the plane at the horizon (skybox has its own exposure so it may need to be darker)")]
-    public Color skyboxGroundColor = new Color(0.13f, 0.32f, 0.09f);
 
     [Tooltip("How many times to scale up the default Unity plane (default plane = 10x10 units)")]
     public float planeScale = 2000f;
@@ -29,8 +27,5 @@ public class GrassGround : MonoBehaviour
             rend.material = mat;
         }
 
-        // Tint the skybox ground colour to match grass so the horizon blends seamlessly
-        if (RenderSettings.skybox != null)
-            RenderSettings.skybox.SetColor("_GroundColor", skyboxGroundColor);
     }
 }
