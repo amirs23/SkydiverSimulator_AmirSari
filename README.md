@@ -236,19 +236,39 @@ Shows zeros as placeholders until EOM_Solver physics are running.
 - [x] Unity project set up with XSens plugin
 - [x] Matlab → UDP → Unity skeleton animation pipeline working
 - [x] Canopy mesh imported and positioned above avatar
-- [x] SkyGrid (floating spheres) working
+- [x] SkyGrid rewritten — fluffy cloud clusters at fixed altitude, avatar descends through them
 - [x] CameraFollow script (camera tracks avatar)
 - [x] SuspensionLines script (lines from canopy to shoulders)
 - [x] GitHub repo set up and shared
 - [x] VR packages added (com.unity.xr.management + com.unity.xr.oculus) — see VR Setup section above
-- [x] VRCameraRig.cs script — handles VR/desktop camera switching
+- [x] VRCameraRig.cs script — handles VR/desktop camera switching, Quest 2 head tracking
 - [x] XR Plug-in Management configured in Unity Editor — Oculus enabled on Android, Quest 2 target set
-- [x] VRCameraRig component added to Main Camera in Integration_Ready.unity
-- [x] HUD overlay (SkydiverHUD.cs) — shows altitude, speed, heading in VR
+- [x] HUD overlay (SkydiverHUD.cs) — shows ALT, SPD, HDG, BRK in VR
+- [x] Physics simulation — parachute aerodynamics, Quest 2 triggers steer left/right, both = brake/flare
+- [x] Velocity arrows (VelocityArrows.cs) — cyan = horizontal, yellow = vertical
+- [x] Wind effect (WindEffect.cs) — cloud particles drift upward giving sense of descent
+- [x] Landing zone marker (LandingZoneMarker.cs) — pulsing orange bullseye, auto-placed at predicted landing spot
+- [x] Destination arrow (DestinationArrow.cs) — floats in front of avatar, points toward landing target
+- [x] Grass ground (GrassGround.cs) — 2000m green plane with skybox horizon blend
+- [x] Avatar restart — A button (Quest) / R key (Editor)
+- [x] Avatar materials converted to URP/Lit — visible on Quest 2
 
 ## What Still Needs To Be Done
 
-See `TASKS.md` for the full task list with assignments.
+### Architecture change — lab simulator replaces internal physics
+The internal physics (`PlayerMovement.cs` + `EOM_Solver.dll`) will be replaced by a UDP receiver that reads position/orientation/velocity for canopy and skydiver from the lab's physics simulator via Matlab. Unity becomes a pure renderer. The XSens avatar animation pipeline (port 9763) is unchanged.
+
+| Task | Priority |
+|------|----------|
+| New UDP receiver for lab simulator data | HIGH |
+| Arm animation driven by steering input values from UDP stream | HIGH |
+| Multi-cell ram-air canopy mesh (each cell a different color, 7 or 9 cells) | HIGH |
+| Full suspension line system rewrite — slider, risers, steering lines, toggles | HIGH |
+| Pilot chute (small dome trailing behind canopy, oriented to velocity) | MEDIUM |
+| Ground environment — trees and buildings visible from altitude | MEDIUM |
+| First/third person camera toggle — keyboard, Quest button, and Matlab UDP signal | MEDIUM |
+| Remove DevColorize from Avatar GameObject | LOW |
+| Horizon color mismatch fine-tuning | LOW |
 
 ---
 

@@ -202,10 +202,26 @@ Fix: Run **Tools → Fix Xsens Materials for URP** in the Editor (script at `Ass
 
 ## Pending tasks (next session)
 
-| Task | Notes |
-|------|-------|
-| Horizon color mismatch | Grass plane green and skybox ground green are slightly different shades due to skybox exposure (1.3×). Two separate color fields exist in GrassGround.cs (Grass Color + Skybox Ground Color) — needs fine-tuning or a better approach. |
-| Canopy position + suspension line fix | Canopy should be slightly forward and tilted (filled with air), not directly above avatar. Suspension lines currently attach at avatar's sides — should attach at front harness points |
+### Architecture change — lab simulator replaces internal physics
+The internal physics engine (`PlayerMovement.cs` with `EOM_Solver.dll` + C# fallback) is being retired. The lab's physics simulator will send all movement data to Matlab, which forwards it to Unity via UDP. Unity becomes a pure renderer. The XSens avatar animation pipeline (port 9763) is unaffected.
+
+Incoming UDP data per frame (port TBD — confirm with lab team):
+- Canopy: position [X,Y,Z], orientation [roll,pitch,yaw], linear velocity [Vx,Vy,Vz], angular velocity [wx,wy,wz]
+- Skydiver CG: same set
+- Wind vector [vx,vy,vz]
+- Left/right steering inputs (0–1 float each)
+
+| Task | Priority | Notes |
+|------|----------|-------|
+| New UDP receiver for lab simulator | HIGH | Replace `PlayerMovement.cs` with a new script that listens on the lab simulator UDP port and applies incoming position/orientation/velocity to the canopy and body Rigidbodies each frame. Port TBD — confirm with lab. |
+| Arm animation from steering inputs | HIGH | Steering input values (left/right, 0–1) come in the simulator UDP packet. Convert to shoulder pitch: 0 = arms fully up, 1 = arms fully down along body. Apply to RightShoulder and LeftShoulder bones. Purely visual — physics effect already handled by simulator. |
+| Ground environment — trees and buildings | MEDIUM | Add trees and buildings on the ground so the skydiver can see them growing larger as they descend from 500m. Use simple procedural geometry or low-poly prefabs — no high-detail assets needed. |
+| First/third person view toggle | MEDIUM | Switch camera at runtime three ways: (1) keyboard key, (2) Meta Quest controller button (same pattern as A = restart), (3) flag received in the Matlab UDP stream. First person = camera at avatar head. Third person = current follow camera. |
+| Remove DevColorize from Avatar | LOW | In Unity Editor: select Avatar in Hierarchy → find DevColorize component in Inspector → right-click → Remove Component. Keep DevColorize on other objects (canopy etc.) if attached. |
+| Canopy overhaul — multi-cell mesh | HIGH | Replace single `Canopy_Rotated.obj` mesh with a procedural multi-cell ram-air canopy. Each cell a different color. 7 or 9 cells (confirm with Sari). |
+| Suspension lines — full rewrite | HIGH | Full rewrite of `SuspensionLines.cs`. Structure: A+B lines from each cell boundary → front-left/right slider corners. C+D lines → rear-left/right slider corners. Slider = flat rectangle halfway down. Below slider: 4 risers to shoulders. Steering lines: cascade of 4 from outer rear cells each side → rear slider corners → skydiver's hands (yellow toggle loops). See suspension_lines reference in projectA folder. |
+| Pilot chute | MEDIUM | Small dome mesh trailing behind the main canopy. Always oriented toward the velocity vector, not the canopy heading. |
+| Horizon color mismatch | LOW | Grass plane green and skybox ground green are slightly different shades. Fine-tune the two color fields in `GrassGround.cs` (Grass Color + Skybox Ground Color). |
 
 ---
 
