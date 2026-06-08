@@ -24,32 +24,37 @@ We are building **two Unity simulation projects** for a skydiving simulator:
 
 ## How The System Works
 
+There are two separate data streams coming into Unity from Matlab:
+
 ```
+Stream 1 — Avatar body animation
+──────────────────────────────────────────────────
 XSens Suit (motion capture hardware)
         OR
 Matlab script (replaying recorded .mvnx file)
         |
-        | UDP packets (port 9763, MXTP02 protocol, 760 bytes)
+        | UDP packets (port 9763, MXTP02 protocol)
         v
-Unity (XSens Movella plugin receives packets)
+Unity — XSens plugin animates avatar skeleton in real-time
+
+Stream 2 — Parachute & skydiver physics
+──────────────────────────────────────────────────
+Lab physics simulator
         |
+        | Matlab forwards data as UDP packets (port TBD)
         v
-Avatar skeleton animates in real-time
+Unity — positions canopy and skydiver CG, updates HUD
+
+Each frame Unity receives: canopy position/orientation/velocity,
+skydiver CG position/orientation/velocity, wind vector,
+and left/right steering inputs (used to animate the arms visually).
+Unity is a pure renderer — all physics are computed by the simulator.
 ```
 
-### The Matlab Script
-- File: `/Users/amirsaid/Desktop/UNITY_F/animate_to_unity.m` (Amir's Mac version)
-- Loads a `.mvnx` motion capture file (`session_tig100126-003.mvnx`)
-- Sends skeleton data to Unity via UDP using Java networking (no toolbox needed on Mac)
-- Anna's original script is `load_mvnx_and_animate.m` — do NOT modify it
-- Run this script AFTER pressing Play in Unity
-
-### The Physics Engine (EOM_Solver)
-- `Assets/Plugins/EOM_Solver.dll` — compiled Matlab aerodynamics model
-- Called from `PlayerMovement.cs` via P/Invoke (C# DllImport)
-- **Windows only — does not work on Mac**
-- Must be tested on the lab Windows PC
-- Takes a 24-element state vector (position, rotation, velocity for canopy + body) and returns the next time step
+### The Matlab Scripts
+- `animate_to_unity.m` — streams avatar skeleton data to Unity on port 9763. Run this after pressing Play in Unity.
+- Anna's original script is `load_mvnx_and_animate.m` — **do NOT modify it**
+- The lab simulator has its own Matlab script that forwards physics data on a separate UDP port (TBD)
 
 ---
 
@@ -162,9 +167,8 @@ SkydiverSimulator_AmirSari/
 1. Open Unity Hub → open `SkydiverSimulator_AmirSari` project
 2. Open scene `Assets/Integration_Ready.unity`
 3. Press **Play** in Unity
-4. In Matlab, navigate to `/Users/amirsaid/Desktop/UNITY_F/`
-5. Open and run `animate_to_unity.m`
-6. The avatar should start animating in Unity
+4. Open and run `animate_to_unity.m` in Matlab — the avatar will start animating
+5. Start the lab physics simulator and its Matlab forwarding script — the canopy and skydiver will start moving
 
 ---
 
