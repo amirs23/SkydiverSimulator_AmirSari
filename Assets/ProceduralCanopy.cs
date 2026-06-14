@@ -57,6 +57,13 @@ public class ProceduralCanopy : MonoBehaviour
         new Color(0.85f, 0.10f, 0.10f),   // red
     };
 
+    // ── Follow target ─────────────────────────────────────────────────────────
+    [Header("Follow Target")]
+    [Tooltip("Drag the Avatar root (or any bone) here. The canopy stays at this position + offset.")]
+    public Transform followTarget;
+    [Tooltip("Offset above the follow target in world units. Y = how high above the avatar.")]
+    public Vector3 followOffset = new Vector3(0f, 7f, 0f);
+
     // ── Bone references ───────────────────────────────────────────────────────
     [Header("Bones — drag from Avatar skeleton")]
     public Transform leftShoulder;
@@ -111,7 +118,12 @@ public class ProceduralCanopy : MonoBehaviour
         UpdateLines();   // set initial positions so nothing is at origin
     }
 
-    void LateUpdate() => UpdateLines();
+    void LateUpdate()
+    {
+        if (followTarget != null)
+            transform.position = followTarget.position + followOffset;
+        UpdateLines();
+    }
 
     // =========================================================================
     // GEOMETRY HELPERS
