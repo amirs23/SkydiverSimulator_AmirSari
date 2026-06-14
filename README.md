@@ -24,10 +24,10 @@ We are building **two Unity simulation projects** for a skydiving simulator:
 
 ## How The System Works
 
-There are two separate data streams coming into Unity from Matlab:
+There are two separate data streams coming into Unity, **both delivered via Matlab**. The critical distinction: **pose and position come from two different sources and must be applied separately.**
 
 ```
-Stream 1 — Avatar body animation
+Stream 1 — Avatar POSE only  (body posture / joint rotations)
 ──────────────────────────────────────────────────
 XSens Suit (motion capture hardware)
         OR
@@ -36,10 +36,12 @@ Matlab script (replaying recorded .mvnx file)
         | UDP packets (port 9763, MXTP02 protocol)
         v
 Unity — XSens plugin animates avatar skeleton in real-time
+        (bone ROTATIONS only — NOT world position)
 
-Stream 2 — Parachute & skydiver physics
+Stream 2 — Avatar POSITION + parachute/skydiver state
 ──────────────────────────────────────────────────
-Lab physics simulator
+A separate external system (NOT part of this project) computes
+the world position. We are only told it will arrive via Matlab.
         |
         | Matlab forwards data as UDP packets (port TBD)
         v
@@ -48,8 +50,16 @@ Unity — positions canopy and skydiver CG, updates HUD
 Each frame Unity receives: canopy position/orientation/velocity,
 skydiver CG position/orientation/velocity, wind vector,
 and left/right steering inputs (used to animate the arms visually).
-Unity is a pure renderer — all physics are computed by the simulator.
+Unity is a pure renderer — all physics are computed externally.
 ```
+
+### CRUCIAL — pose vs. position split (read before touching avatar/canopy code)
+
+- **XSens animates POSE ONLY.** It drives the avatar's joint rotations (arms moving, body bending) — it does **not** move the avatar through the world. The XSens data itself is received via Matlab.
+- **Position comes from a completely separate system** that is **not part of this project**. We don't control or know its internals — all we're told is that position/orientation data will also arrive via Matlab, alongside the parachute state.
+- These are **two independent streams** that both happen to come through Matlab. When wiring anything that depends on where the avatar *is* vs. how it's *posed*, keep them separate.
+
+> **Why this matters for the steering lines / canopy:** because the world position is driven externally and pose is XSens-only, do not assume the avatar root moves the way an internally-simulated body would. Visual attachments (suspension/steering lines) should sample live bone world-positions every `LateUpdate` rather than assuming a fixed avatar position — see `ProceduralCanopy.cs`.
 
 ### The Matlab Scripts
 - `animate_to_unity.m` — streams avatar skeleton data to Unity on port 9763. Run this after pressing Play in Unity.
@@ -127,6 +137,34 @@ Creates 60 small cloud-sphere particles that drift upward past the avatar, givin
 - **followTarget**: drag the Avatar transform in Inspector
 - **driftSpeed**: 8 m/s upward drift (simulates falling at 8 m/s)
 - **spawnRadius**: 10 m — particles spawn in a sphere this size around the avatar
+
+### `ProceduralCanopy.cs`
+Builds a full ram-air parachute at runtime (cells, slider, pilot chute, suspension lines, risers, steering lines) — no external mesh needed. Attach to an empty GameObject ("Parachute") above the avatar.
+- **Follow Target**: Avatar — canopy stays at `followTarget.position + followOffset` (default +7 m Y).
+- **Left/Right Shoulder, Left/Right Hand**: avatar bones. We use `jLeftShoulder`/`jRightShoulder` and `jLeftWrist`/`jRightWrist`. If an Inspector ref comes back null at runtime, `ResolveBones()` re-finds it by name under the Avatar.
+- **Bake workflow**: right-click the component header → **"Bake Canopy (static parts → scene)"** generates the cells + slider + pilot chute + suspension lines as real saved child objects under `CanopyBaked` (editable in Edit mode, persists). Right-click → **"Clear Baked Parts"** to redo. On Play the baked statics are NOT regenerated — only the dynamic riser/steering cables are built.
+- **Static vs dynamic split**: cells/slider/pilot/suspension lines are static (ride rigidly with the canopy). Risers (→ shoulders) and steering lines (→ hands) are rebuilt and updated every `LateUpdate` because they attach to moving bones. `[DefaultExecutionOrder(10000)]` makes this run after the XSens pose is applied.
+- **showHandMarkers** (Debug): spawns magenta spheres at the hand bones the code reads, for diagnosing attachment. Turn off when done.
+
+### `ToggleArmAnimation.cs`
+Animates the avatar's arms to match toggle input (visual only). Neutral = arms raised to the toggles; pulling left/right trigger swings that arm down toward the hip; both = full brake. Reads `PlayerMovement.LeftToggle`/`RightToggle`, falls back to direct XR trigger and keyboard (A/D/Space). Attach to the Avatar, drag in `jLeftShoulder`/`jLeftElbow` and `jRightShoulder`/`jRightElbow`. Tune Raised/Pulled Euler offsets in Inspector.
+
+### ⚠️ KNOWN ISSUE — steering lines don't reach the hands (open, picked up next session)
+**Goal:** the yellow steering cables should visually connect to the avatar's hands and follow them, so pulling looks like steering (purely cosmetic; we do NOT move the avatar).
+
+**What we tried (all in `ProceduralCanopy.cs`):**
+1. Confirmed the Inspector hand slots resolve OK at runtime (`ResolveBones()` logs `LHand:ok RHand:ok`).
+2. Tried routing steering lines through the slider corners → they cut across to the body, because the canopy's wingspan runs along **world X** but the avatar's hands sit on **world Z** (hands logged at `(0, 1.40, ±0.78)` — both X=0).
+3. Tried rotating the canopy to align span with the shoulders → broke layout (avatar root has a non-identity rotation; compounding threw the canopy off). **Reverted — rotation code fully removed.**
+4. Current approach: each steering line is a near-vertical cable from the canopy underside straight down to the hand (`SetSteerCable`). Cleaner, but still ends short of the hands.
+
+**Root cause found (via `showHandMarkers`):** the magenta markers — placed exactly at `jLeftWrist`/`jRightWrist` — sit at the **torso/center**, NOT at the visible hands. The assigned wrist bones are not co-located with the visible hands. Tested **with the XSens/Matlab stream active and the markers STILL stayed at the torso** (so it is not just an un-streamed bind-pose artifact).
+
+**Next steps to try:**
+- In Play mode, expand the Avatar in the Hierarchy and click each bone to find which transform actually sits at the visible hand (the SkinnedMeshRenderer's real skinning bone may differ from `jLeftWrist`). Assign THAT to Left/Right Hand.
+- Check the Avatar (and any parent) Transform **scale** — a scaled rig makes bone world-positions not match the rendered mesh.
+- Confirm there aren't two skeletons (an XSens segment hierarchy vs. the mesh's skinning skeleton); the path was `Avatar/jLeftWrist` — verify the mesh is skinned to those same bones.
+- The diagnostic `Debug.Log` lines in `ResolveBones()` and the `showHandMarkers` spheres are still ON — keep them until the hands line up, then remove.
 
 ### `LandingZoneMarker.cs`
 Draws a pulsing orange bullseye on the ground as the target landing zone. Attach to a new empty GameObject and position it where you want the target.

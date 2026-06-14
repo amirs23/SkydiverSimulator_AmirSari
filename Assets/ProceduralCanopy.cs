@@ -2,27 +2,39 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Procedural ram-air parachute canopy — generates the full rigging system at runtime.
+/// Procedural ram-air parachute canopy.
 ///
-/// What gets built:
-///   • N inflated cells (each a different colour), arced elliptically wingtip-to-wingtip
-///   • Suspension lines: rows A, B → front slider corners; rows C, D → rear slider corners
-///   • Slider: white rectangle that the lines converge through
-///   • 4 risers: front-L, front-R, rear-L, rear-R → shoulders
-///   • Steering lines: cascade from outer 2 cells each side → rear slider corners → toggles (hands)
-///   • Pilot chute: small sphere trailing behind the canopy tail
+/// TWO PARTS:
+///   • STATIC (bakeable into real saved objects): cells, slider, pilot chute,
+///     and the internal A/B/C/D suspension lines. These never move relative to
+///     the canopy, so they can be baked once and saved into the scene.
+///   • DYNAMIC (always runtime): risers → shoulders, steering lines → hands.
+///     These attach to avatar bones that move every frame, so they CANNOT be
+///     baked — they are rebuilt and updated live each LateUpdate.
 ///
 /// Setup:
 ///   1. Create empty GameObject in scene → Add Component → ProceduralCanopy.
 ///   2. Position it ~7 m above the Avatar's hips.
-///   3. Drag jLeftShoulder, jRightShoulder, jLeftHand, jRightHand into Inspector slots.
-///   4. Play — everything is generated in code, no external assets needed.
+///   3. Drag Follow Target + the 4 bone slots (shoulders, hands) in the Inspector.
 ///
-/// To replace Canopy_Rotated + SuspensionLines:
-///   • Disable or delete the old Canopy_Rotated GameObject.
-///   • Disable SuspensionLines.cs on its GameObject (or delete it).
-///   • Wire this component's bone slots instead.
+/// Baking into real objects (recommended):
+///   • Fill in all the shape/colour values you want.
+///   • Right-click the component header → "Bake Canopy (static parts → scene)".
+///     This creates a child "CanopyBaked" object holding the cells, slider,
+///     pilot chute and suspension lines as real, editable, saved geometry.
+///   • Save the scene (Cmd+S). On Play, the static parts are NOT regenerated —
+///     only the riser + steering cables are built and animated to the bones.
+///   • Right-click → "Clear Baked Parts" to remove them and start over.
+///
+/// If you never bake, everything is generated at runtime as before (backward
+/// compatible) — the static parts just won't be visible/editable in Edit mode.
+///
+/// NOTE: [DefaultExecutionOrder] forces this script's LateUpdate to run AFTER
+/// the XSens plugin has applied the avatar pose for the frame. Without this the
+/// riser/steering cables read stale (bind-pose) bone positions and appear to
+/// "not connect" to the hands.
 /// </summary>
+[DefaultExecutionOrder(10000)]
 public class ProceduralCanopy : MonoBehaviour
 {
     // ── Canopy shape ──────────────────────────────────────────────────────────
@@ -90,6 +102,10 @@ public class ProceduralCanopy : MonoBehaviour
     // A & B lines converge to front slider corners; C & D to rear corners.
     static readonly float[] CF = { 0.18f, 0.38f, 0.62f, 0.82f };
 
+    // Names of the auto-generated child containers.
+    const string BakedName   = "CanopyBaked";    // static parts (bakeable / saved)
+    const string DynamicName = "CanopyDynamic";  // riser + steering cables (runtime only)
+
     // ─────────────────────────────────────────────────────────────────────────
     // Runtime
     // ─────────────────────────────────────────────────────────────────────────
@@ -97,37 +113,136 @@ public class ProceduralCanopy : MonoBehaviour
     float _slHW;           // slider half-width  (along span)
     float _slHD;           // slider half-depth  (along chord)
 
-    // All LineRenderers in build order:
-    //   [0 … ribCount*4 - 1]  suspension lines (4 per rib: A, B, C, D)
-    //   [ribCount*4 … +3]     riser lines (FL, FR, RL, RR)
-    //   [+4 … +7]             steering lines (left×2, right×2)
-    readonly List<LineRenderer> _lines = new List<LineRenderer>();
-    int _riserStart;
-    int _steerStart;
+    // Dynamic cables, rebuilt every Play:
+    readonly List<LineRenderer> _riserLines = new List<LineRenderer>();  // FL, FR, RL, RR
+    readonly List<LineRenderer> _steerLines = new List<LineRenderer>();  // L×2, R×2
 
-    LineRenderer _pilotLR;
-    Transform    _pilotSphere;
+    [Header("Debug")]
+    [Tooltip("Spawn bright magenta spheres at the hand bones the code is reading, so you " +
+             "can see exactly where it thinks the hands are. Turn off once aligned.")]
+    public bool showHandMarkers = true;
+    Transform _markL, _markR;
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // =========================================================================
+    // LIFECYCLE
+    // =========================================================================
     void Start()
     {
-        BuildCells();
-        BuildSlider();
-        BuildLines();
-        BuildPilotChute();
-        UpdateLines();   // set initial positions so nothing is at origin
+        InitSliderDims();
+        ResolveBones();
+
+        // Build the static parts at runtime ONLY if they were never baked.
+        if (transform.Find(BakedName) == null)
+            BuildStatic(transform);
+
+        BuildDynamicLines();
+        UpdateDynamicLines();   // initial positions so nothing sits at origin
+    }
+
+    // Bone references assigned in the Inspector can come back null at runtime on a
+    // streamed/retargeted XSens avatar. If that happens, re-find them by name under
+    // the follow target (the Avatar) so the cables still attach correctly.
+    void ResolveBones()
+    {
+        leftShoulder  = Resolve(leftShoulder,  "jLeftShoulder");
+        rightShoulder = Resolve(rightShoulder, "jRightShoulder");
+        leftHand      = Resolve(leftHand,      "jLeftWrist",  "jLeftHand");
+        rightHand     = Resolve(rightHand,     "jRightWrist", "jRightHand");
+
+        Debug.Log("[ProceduralCanopy] Bones — " +
+                  $"LSh:{(leftShoulder ? "ok" : "NULL")} " +
+                  $"RSh:{(rightShoulder ? "ok" : "NULL")} " +
+                  $"LHand:{(leftHand ? "ok" : "NULL")} " +
+                  $"RHand:{(rightHand ? "ok" : "NULL")}");
+
+        if (leftHand)  Debug.Log($"[ProceduralCanopy] leftHand  '{leftHand.name}'  worldPos={leftHand.position}  (path: {Path(leftHand)})");
+        if (rightHand) Debug.Log($"[ProceduralCanopy] rightHand '{rightHand.name}' worldPos={rightHand.position} (path: {Path(rightHand)})");
+        Debug.Log($"[ProceduralCanopy] canopy worldPos={transform.position}");
+    }
+
+    static string Path(Transform t)
+    {
+        string p = t.name;
+        while (t.parent != null) { t = t.parent; p = t.name + "/" + p; }
+        return p;
+    }
+
+    Transform Resolve(Transform assigned, params string[] names)
+    {
+        if (assigned != null) return assigned;            // valid reference — keep it
+        Transform searchRoot = followTarget != null ? followTarget : transform;
+        foreach (var n in names)
+        {
+            var found = FindDeep(searchRoot, n);
+            if (found != null) return found;
+        }
+        return assigned;
+    }
+
+    static Transform FindDeep(Transform root, string name)
+    {
+        if (root.name == name) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var r = FindDeep(root.GetChild(i), name);
+            if (r != null) return r;
+        }
+        return null;
     }
 
     void LateUpdate()
     {
         if (followTarget != null)
             transform.position = followTarget.position + followOffset;
-        UpdateLines();
+        UpdateDynamicLines();
+    }
+
+    // =========================================================================
+    // EDITOR BAKE  (right-click the component header in the Inspector)
+    // =========================================================================
+    [ContextMenu("Bake Canopy (static parts → scene)")]
+    void BakeCanopy()
+    {
+        ClearBaked();
+        InitSliderDims();
+
+        var container = new GameObject(BakedName);
+        container.transform.SetParent(transform, false);
+        BuildStatic(container.transform);
+
+        Debug.Log("[ProceduralCanopy] Baked static parts into '" + BakedName +
+                  "'. Save the scene (Cmd+S) to keep them.");
+    }
+
+    [ContextMenu("Clear Baked Parts")]
+    void ClearBaked()
+    {
+        var c = transform.Find(BakedName);
+        if (c != null) SafeDestroy(c.gameObject);
+    }
+
+    // =========================================================================
+    // STATIC PARTS  — cells, slider, pilot chute, suspension lines
+    // Parented under 'root' (either the canopy itself at runtime, or the
+    // CanopyBaked container when baking). All geometry is identical either way.
+    // =========================================================================
+    void BuildStatic(Transform root)
+    {
+        BuildCells(root);
+        BuildSlider(root);
+        BuildSuspensionLines(root);
+        BuildPilotChute(root);
     }
 
     // =========================================================================
     // GEOMETRY HELPERS
     // =========================================================================
+    void InitSliderDims()
+    {
+        _sliderLocalY = -(span * 0.30f);
+        _slHW         = span  * 0.18f;
+        _slHD         = chord * 0.22f;
+    }
 
     // Vertical rise at span-position x due to the elliptical arc.
     // Centre = arcHeight (highest); wingtips = 0 (lowest) — inverted parabola.
@@ -154,8 +269,7 @@ public class ProceduralCanopy : MonoBehaviour
     // =========================================================================
     // CELL MESHES
     // =========================================================================
-
-    void BuildCells()
+    void BuildCells(Transform root)
     {
         float cellW = span / cellCount;
 
@@ -169,14 +283,14 @@ public class ProceduralCanopy : MonoBehaviour
                       : Color.HSVToRGB((float)c / cellCount, 0.85f, 0.9f);
 
             var go = new GameObject($"Cell{c:D2}");
-            go.transform.SetParent(transform, false);
-            go.AddComponent<MeshFilter>().mesh = MakeCellMesh(xL, xR);
+            go.transform.SetParent(root, false);
+            go.AddComponent<MeshFilter>().sharedMesh = MakeCellMesh(xL, xR);
 
             var mr  = go.AddComponent<MeshRenderer>();
             var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
             mat.color = col;
             mat.SetFloat("_Smoothness", 0.08f);
-            mr.material  = mat;
+            mr.sharedMaterial   = mat;
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
         }
     }
@@ -297,58 +411,123 @@ public class ProceduralCanopy : MonoBehaviour
     // =========================================================================
     // SLIDER
     // =========================================================================
-
-    void BuildSlider()
+    void BuildSlider(Transform root)
     {
-        _sliderLocalY = -(span * 0.30f);
-        _slHW         = span  * 0.18f;
-        _slHD         = chord * 0.22f;
-
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
         go.name = "Slider";
-        go.transform.SetParent(transform, false);
+        go.transform.SetParent(root, false);
         go.transform.localPosition = new Vector3(0f, _sliderLocalY, -chord * 0.5f);
         go.transform.localScale    = new Vector3(_slHW * 2f, 0.012f, _slHD * 2f);
-        Destroy(go.GetComponent<BoxCollider>());
+        SafeDestroy(go.GetComponent<BoxCollider>());
 
         var mr  = go.GetComponent<MeshRenderer>();
         var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
         mat.color = new Color(0.9f, 0.9f, 0.9f);
-        mr.material = mat;
+        mr.sharedMaterial = mat;
     }
 
     // =========================================================================
-    // LINES — build all LineRenderers once
+    // SUSPENSION LINES  (static — both ends live inside the canopy)
+    // Built in LOCAL space so they ride rigidly with the canopy/baked container.
     // =========================================================================
-
-    void BuildLines()
-    {
-        int ribCount = cellCount + 1;
-
-        // 4 suspension lines per rib (A, B → front corner; C, D → rear corner)
-        for (int r = 0; r < ribCount; r++)
-            for (int i = 0; i < 4; i++)
-                _lines.Add(MakeLR(suspColor, lineWidth, 2));
-
-        // 4 riser lines (front-L, front-R, rear-L, rear-R)
-        _riserStart = _lines.Count;
-        for (int i = 0; i < 4; i++)
-            _lines.Add(MakeLR(suspColor, lineWidth * 2f, 2));
-
-        // 4 steering lines (left×2, right×2) — 3 waypoints each
-        _steerStart = _lines.Count;
-        for (int i = 0; i < 4; i++)
-            _lines.Add(MakeLR(steeringColor, lineWidth, 3));
-    }
-
-    // =========================================================================
-    // LINES — update positions every LateUpdate
-    // =========================================================================
-
-    void UpdateLines()
+    void BuildSuspensionLines(Transform root)
     {
         int   ribCount = cellCount + 1;
         float cellW    = span / cellCount;
+
+        Vector3 slFL = SL_FL(), slFR = SL_FR(), slRL = SL_RL(), slRR = SL_RR();
+
+        for (int r = 0; r < ribCount; r++)
+        {
+            float   ribX     = -span * 0.5f + r * cellW;
+            bool    isLeft   = ribX <= 0f;
+            Vector3 frontCor = isLeft ? slFL : slFR;
+            Vector3 rearCor  = isLeft ? slRL : slRR;
+
+            // A & B → front slider corner; C & D → rear slider corner
+            MakeStaticLine(root, "SuspA", AttachLocal(ribX, CF[0]), frontCor);
+            MakeStaticLine(root, "SuspB", AttachLocal(ribX, CF[1]), frontCor);
+            MakeStaticLine(root, "SuspC", AttachLocal(ribX, CF[2]), rearCor);
+            MakeStaticLine(root, "SuspD", AttachLocal(ribX, CF[3]), rearCor);
+        }
+    }
+
+    // =========================================================================
+    // PILOT CHUTE  (static — trails behind canopy tail in local space)
+    // =========================================================================
+    void BuildPilotChute(Transform root)
+    {
+        Vector3 tail  = new Vector3(0f, ArcY(0f), -chord);
+        Vector3 pilot = tail - Vector3.forward * pilotLineLen;   // local +Z is canopy forward
+
+        var line = MakeLR(root, "PilotLine", new Color(0.65f, 0.65f, 0.65f),
+                          lineWidth * 0.8f, 2, worldSpace: false);
+        line.SetPositions(new[] { tail, pilot });
+
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = "PilotChute";
+        go.transform.SetParent(root, false);
+        go.transform.localPosition = pilot;
+        go.transform.localScale    = Vector3.one * (pilotRadius * 2f);
+        SafeDestroy(go.GetComponent<SphereCollider>());
+
+        var mr  = go.GetComponent<MeshRenderer>();
+        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        mat.color = new Color(0.7f, 0.7f, 0.7f);
+        mr.sharedMaterial = mat;
+    }
+
+    // =========================================================================
+    // DYNAMIC CABLES  — risers (→ shoulders) + steering lines (→ hands)
+    // Rebuilt every Play, updated every LateUpdate. World-space.
+    // =========================================================================
+    void BuildDynamicLines()
+    {
+        // Clean up any stale runtime container (e.g. left over in a saved scene).
+        var stale = transform.Find(DynamicName);
+        if (stale != null) SafeDestroy(stale.gameObject);
+
+        var container = new GameObject(DynamicName);
+        container.transform.SetParent(transform, false);
+        Transform root = container.transform;
+
+        _riserLines.Clear();
+        _steerLines.Clear();
+
+        // 4 risers (front-L, front-R, rear-L, rear-R) — thicker
+        for (int i = 0; i < 4; i++)
+            _riserLines.Add(MakeLR(root, "Riser", suspColor, lineWidth * 2f, 2, worldSpace: true));
+
+        // 4 steering lines (left×2, right×2) — 2 points: canopy underside → hand
+        for (int i = 0; i < 4; i++)
+            _steerLines.Add(MakeLR(root, "Steer", steeringColor, lineWidth, 2, worldSpace: true));
+
+        if (showHandMarkers)
+        {
+            _markL = MakeMarker(root, "HandMarkerL");
+            _markR = MakeMarker(root, "HandMarkerR");
+        }
+    }
+
+    Transform MakeMarker(Transform root, string name)
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = name;
+        go.transform.SetParent(root, false);
+        go.transform.localScale = Vector3.one * 0.18f;
+        SafeDestroy(go.GetComponent<SphereCollider>());
+        var mr  = go.GetComponent<MeshRenderer>();
+        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        mat.color = Color.magenta;
+        mr.sharedMaterial = mat;
+        return go.transform;
+    }
+
+    void UpdateDynamicLines()
+    {
+        if (_riserLines.Count < 4 || _steerLines.Count < 4) return;
+
+        float cellW = span / cellCount;
 
         // Slider corners in world space
         Vector3 slFL = transform.TransformPoint(SL_FL());
@@ -356,112 +535,84 @@ public class ProceduralCanopy : MonoBehaviour
         Vector3 slRL = transform.TransformPoint(SL_RL());
         Vector3 slRR = transform.TransformPoint(SL_RR());
 
-        // ── Suspension lines ──────────────────────────────────────────────────
-        for (int r = 0; r < ribCount; r++)
-        {
-            float   ribX     = -span * 0.5f + r * cellW;
-            bool    isLeft   = ribX <= 0f;
-            Vector3 frontCor = isLeft ? slFL : slFR;
-            Vector3 rearCor  = isLeft ? slRL : slRR;
-            int     lineBase = r * 4;
-
-            _lines[lineBase + 0].SetPositions(new[]
-                { transform.TransformPoint(AttachLocal(ribX, CF[0])), frontCor });  // A
-            _lines[lineBase + 1].SetPositions(new[]
-                { transform.TransformPoint(AttachLocal(ribX, CF[1])), frontCor });  // B
-            _lines[lineBase + 2].SetPositions(new[]
-                { transform.TransformPoint(AttachLocal(ribX, CF[2])), rearCor });   // C
-            _lines[lineBase + 3].SetPositions(new[]
-                { transform.TransformPoint(AttachLocal(ribX, CF[3])), rearCor });   // D
-        }
-
-        // ── Risers ────────────────────────────────────────────────────────────
+        // ── Risers → shoulders ──────────────────────────────────────────────
         Vector3 lSh = leftShoulder  ? leftShoulder.position
                     : transform.TransformPoint(new Vector3(-0.35f, _sliderLocalY - span * 0.25f, 0f));
         Vector3 rSh = rightShoulder ? rightShoulder.position
                     : transform.TransformPoint(new Vector3( 0.35f, _sliderLocalY - span * 0.25f, 0f));
 
-        _lines[_riserStart + 0].SetPositions(new[] { slFL, lSh });   // front-left
-        _lines[_riserStart + 1].SetPositions(new[] { slFR, rSh });   // front-right
-        _lines[_riserStart + 2].SetPositions(new[] { slRL, lSh });   // rear-left
-        _lines[_riserStart + 3].SetPositions(new[] { slRR, rSh });   // rear-right
+        _riserLines[0].SetPositions(new[] { slFL, lSh });   // front-left
+        _riserLines[1].SetPositions(new[] { slFR, rSh });   // front-right
+        _riserLines[2].SetPositions(new[] { slRL, lSh });   // rear-left
+        _riserLines[3].SetPositions(new[] { slRR, rSh });   // rear-right
 
-        // ── Steering lines ────────────────────────────────────────────────────
-        // Attach at trailing edge (chord fraction 1.0) of 2 outer cells each side.
+        // ── Steering lines → hands ──────────────────────────────────────────
+        // The canopy's wingspan runs along X but the avatar's hands sit on the Z
+        // axis, so the canopy's own slider corners don't line up with the hands.
+        // Rather than fight that, each steering line is a simple near-vertical cable:
+        // the TOP sits on the canopy's lower surface directly above the hand, the
+        // BOTTOM is the hand itself. When the hand pulls down the cable just shortens,
+        // clearly showing the steering input. Two lines per hand, slightly spread.
         Vector3 lH = leftHand  ? leftHand.position  : lSh + Vector3.down * 0.55f;
         Vector3 rH = rightHand ? rightHand.position : rSh + Vector3.down * 0.55f;
 
-        float[] stXL = { -span * 0.5f + 0.25f * cellW, -span * 0.5f + 1.25f * cellW };
-        float[] stXR = {  span * 0.5f - 0.25f * cellW,  span * 0.5f - 1.25f * cellW };
+        SetSteerCable(_steerLines[0], lH, -0.12f);
+        SetSteerCable(_steerLines[1], lH,  0.12f);
+        SetSteerCable(_steerLines[2], rH, -0.12f);
+        SetSteerCable(_steerLines[3], rH,  0.12f);
 
-        for (int i = 0; i < 2; i++)
-        {
-            Vector3 att = transform.TransformPoint(AttachLocal(stXL[i], 1f, midHeight: false));
-            _lines[_steerStart + i].SetPositions(new[] { att, slRL, lH });
-        }
-        for (int i = 0; i < 2; i++)
-        {
-            Vector3 att = transform.TransformPoint(AttachLocal(stXR[i], 1f, midHeight: false));
-            _lines[_steerStart + 2 + i].SetPositions(new[] { att, slRR, rH });
-        }
-
-        // ── Pilot chute ───────────────────────────────────────────────────────
-        if (_pilotLR != null)
-        {
-            // Attaches at the tail centre (trailing edge, mid-arc height)
-            Vector3 tail  = transform.TransformPoint(new Vector3(0f, ArcY(0f), -chord));
-            // Trails directly behind the canopy (opposite to canopy forward)
-            Vector3 pilot = tail - transform.forward * pilotLineLen;
-            _pilotLR.SetPositions(new[] { tail, pilot });
-            if (_pilotSphere != null) _pilotSphere.position = pilot;
-        }
+        if (_markL) _markL.position = lH;
+        if (_markR) _markR.position = rH;
     }
 
     // =========================================================================
-    // PILOT CHUTE
+    // HELPERS
     // =========================================================================
 
-    void BuildPilotChute()
+    // One steering cable: top anchored on the canopy's lower surface directly above
+    // the hand (offset slightly along the span so the pair reads as two lines), bottom
+    // at the hand. xOffset is in canopy-local span units.
+    void SetSteerCable(LineRenderer lr, Vector3 handWorld, float xOffset)
     {
-        _pilotLR = MakeLR(new Color(0.65f, 0.65f, 0.65f), lineWidth * 0.8f, 2);
-
-        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        go.name = "PilotChute";
-        go.transform.SetParent(transform, false);
-        go.transform.localScale = Vector3.one * (pilotRadius * 2f);
-        Destroy(go.GetComponent<SphereCollider>());
-
-        var mr  = go.GetComponent<MeshRenderer>();
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = new Color(0.7f, 0.7f, 0.7f);
-        mr.material = mat;
-
-        _pilotSphere = go.transform;
+        Vector3 hLoc = transform.InverseTransformPoint(handWorld);
+        float   lx   = Mathf.Clamp(hLoc.x + xOffset, -span * 0.5f, span * 0.5f);
+        float   lz   = Mathf.Clamp(hLoc.z, -chord, 0f);              // keep within the canopy footprint
+        Vector3 top  = transform.TransformPoint(new Vector3(lx, ArcY(lx), lz));   // on the lower surface
+        lr.SetPositions(new[] { top, handWorld });
     }
 
-    // =========================================================================
-    // HELPER — create a LineRenderer child
-    // =========================================================================
-
-    LineRenderer MakeLR(Color col, float width, int pointCount)
+    // Static local-space line between two local-space points (2 waypoints).
+    void MakeStaticLine(Transform root, string name, Vector3 aLocal, Vector3 bLocal)
     {
-        var go = new GameObject("LR");
-        go.transform.SetParent(transform, false);
+        var lr = MakeLR(root, name, suspColor, lineWidth, 2, worldSpace: false);
+        lr.SetPositions(new[] { aLocal, bLocal });
+    }
 
-        var lr             = go.AddComponent<LineRenderer>();
-        lr.useWorldSpace   = true;
-        lr.positionCount   = pointCount;
-        lr.startWidth      = width;
-        lr.endWidth        = width;
+    LineRenderer MakeLR(Transform root, string name, Color col, float width, int pointCount, bool worldSpace)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(root, false);
+
+        var lr               = go.AddComponent<LineRenderer>();
+        lr.useWorldSpace     = worldSpace;
+        lr.positionCount     = pointCount;
+        lr.startWidth        = width;
+        lr.endWidth          = width;
         lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        lr.receiveShadows  = false;
+        lr.receiveShadows    = false;
 
         var mat        = new Material(Shader.Find("Sprites/Default"));
         mat.color      = col;
-        lr.material    = mat;
+        lr.sharedMaterial = mat;
 
-        var zeros = new Vector3[pointCount];
-        lr.SetPositions(zeros);
+        lr.SetPositions(new Vector3[pointCount]);
         return lr;
+    }
+
+    static void SafeDestroy(Object o)
+    {
+        if (o == null) return;
+        if (Application.isPlaying) Destroy(o);
+        else                       DestroyImmediate(o);
     }
 }

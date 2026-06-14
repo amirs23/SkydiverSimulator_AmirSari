@@ -1,5 +1,5 @@
 # TASKS — SkydiverSimulator
-**Last updated: 2026-05-31 (Sari) — DestinationArrow added**
+**Last updated: 2026-06-14 (Sari) — ProceduralCanopy + bake workflow; steering-line hand attachment blocked (see In Progress)**
 **Amir's AI**: Claude (claude-sonnet-4-6)
 **Sari's AI**: Claude (claude-sonnet-4-6)
 
@@ -39,7 +39,9 @@
 
 ## In Progress
 
-*(none)*
+| Task | Assigned to | Notes |
+|------|-------------|-------|
+| Steering lines → hands (visual cable) | Sari (2026-06-14) | **BLOCKED on bone location.** ProceduralCanopy builds the chute + cables; bake workflow added (right-click component → Bake Canopy). Yellow steering cables won't reach the hands. Diagnosed with `showHandMarkers`: magenta markers sit at the TORSO, not the hands — `jLeftWrist`/`jRightWrist` are NOT co-located with the visible hands, even WITH the XSens stream active. Next: find the transform that actually sits at the visible hand (real skinning bone) and assign it; check Avatar scale; check for two skeletons. Full write-up in README → "KNOWN ISSUE — steering lines don't reach the hands". Debug logs + markers still ON. |
 
 ## To Do — Project 2 (VR Parachute)
 
