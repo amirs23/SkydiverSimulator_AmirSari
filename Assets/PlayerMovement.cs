@@ -13,8 +13,10 @@ public class PlayerMovement : MonoBehaviour
     public Rigidbody rbBody;
     public Transform playerTransform;
 
-    // Read by SkydiverHUD to show brake level on the HUD (0=no brake, 1=full flare).
-    public static float BrakeLevel { get; private set; }
+    // Read by SkydiverHUD / ToggleArmAnimation every frame.
+    public static float BrakeLevel   { get; private set; }
+    public static float LeftToggle   { get; private set; }
+    public static float RightToggle  { get; private set; }
 
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
     [DllImport("EOM_Solver")]
@@ -81,7 +83,9 @@ public class PlayerMovement : MonoBehaviour
         // Brake level = symmetric portion of both toggles (0 = no brake, 1 = full flare).
         // Differential portion still drives turning.
         float brakeLevel = Mathf.Min(rightToggle, leftToggle);
-        BrakeLevel = brakeLevel;
+        BrakeLevel  = brakeLevel;
+        LeftToggle  = leftToggle;
+        RightToggle = rightToggle;
 
         // Remove the symmetric brake component before computing turning.
         float rightTurn = rightToggle - brakeLevel;
