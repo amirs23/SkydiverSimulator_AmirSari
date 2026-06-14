@@ -130,8 +130,8 @@ public class ProceduralCanopy : MonoBehaviour
     // =========================================================================
 
     // Vertical rise at span-position x due to the elliptical arc.
-    // Centre = 0 rise; wingtips = arcHeight.
-    float ArcY(float x) => arcHeight * Mathf.Pow(x / (span * 0.5f), 2f);
+    // Centre = arcHeight (highest); wingtips = 0 (lowest) — inverted parabola.
+    float ArcY(float x) => arcHeight * (1f - Mathf.Pow(x / (span * 0.5f), 2f));
 
     // Local-space attachment point for a suspension line:
     //   x         = span position of the rib
