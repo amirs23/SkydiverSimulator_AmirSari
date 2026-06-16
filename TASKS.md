@@ -1,5 +1,5 @@
 # TASKS — SkydiverSimulator
-**Last updated: 2026-06-16 (Sari) — steering-line hand attachment fix applied (skinned bones LeftCarpus/RightCarpus); needs in-Editor confirmation (see In Progress)**
+**Last updated: 2026-06-17 (Sari) — steering-line hand attachment DONE (toggle grips + thicker lines); added 3 new Project-2 tasks: camera switcher, richer environment, Matlab-driven movement**
 **Amir's AI**: Claude (claude-sonnet-4-6)
 **Sari's AI**: Claude (claude-sonnet-4-6)
 
@@ -34,6 +34,7 @@
 | Destination arrow (nav indicator) | Sari (2026-05-31) | DestinationArrow.cs — arrow floats in front of avatar, points toward a draggable destination target. All fields Inspector-configurable: avatar ref, destination ref, local offset (position on avatar), shaft length, line width, head fraction, color. Add empty GameObject → Add Component → DestinationArrow → drag Avatar + destination target. |
 | Grass ground | Sari (2026-05-31) | GrassGround.cs — attach to Plane. Auto-scales plane to 2000x, applies green URP/Lit material, sets skybox ground color for horizon blend. |
 | Cloud layer (SkyGrid rewrite) | Sari (2026-05-31) | SkyGrid.cs rewritten — fluffy puff-sphere cloud clusters, fixed Y altitude, follows avatar in XZ. Avatar start height raised to 500m. |
+| Steering lines → hands + toggle grips + line thickness | Sari (2026-06-16) | ProceduralCanopy steering cables now attach to the real skinned hand bones. **Key gotcha:** the avatar imports TWO copies of each arm bone — flat copies under `Avatar/` (`Avatar/LeftCarpus`, `jLeftWrist`) sit at the torso and never move; the real Hips-rooted copies carry a `" 1"` suffix (`LeftCarpus 1` = visible hand). `FindSkinnedBone()` ignores the trailing `" 1"` and prefers the `Hips`-rooted copy. Replaced the magenta debug markers with steering-toggle grips (`showToggleHandles`). Bumped `lineWidth` 0.006 → 0.035 so the thin lines stop rendering dashed at distance. See README → "FIXED — steering lines now attach to the hands". Commits `b2ac784`, `5d16ce3`. |
 
 ---
 
@@ -41,12 +42,15 @@
 
 | Task | Assigned to | Notes |
 |------|-------------|-------|
-| Steering lines → hands (visual cable) | Sari (2026-06-16) | **DONE.** Avatar has TWO copies of each arm bone: real skinned ones are nested under `Hips` with a `" 1"` suffix (`LeftCarpus 1` at X=-0.79 = visible hand); flat copies under `Avatar/` sit at the torso and never move. `ProceduralCanopy.FindSkinnedBone()` matches the name ignoring a trailing `" 1"` and prefers the copy with a `Hips` ancestor → resolves to `LeftCarpus 1`/`RightCarpus 1`. Confirmed cables + markers sit on the hands and follow live. Debug markers/diagnostics removed; replaced with steering-toggle grips in each hand (`showToggleHandles`). See README → "FIXED — steering lines now attach to the hands". |
+| _(none)_ | | |
 
 ## To Do — Project 2 (VR Parachute)
 
 | Task | Assigned to | Priority | Notes |
 |------|-------------|----------|-------|
+| First/third-person camera switcher | TBD | MED | Toggle at runtime between **first-person** (`VRCameraRig.cs` — head-tracked, eye-level under the canopy) and **third-person** (`CameraFollow.cs` — chase cam, `offset (0,2,-6)` behind/above the avatar). Add an input (Quest button + key in Editor) that enables one camera/script and disables the other. Decide default mode on launch. |
+| Richer environment (buildings, trees, props) | TBD | MED | Today the world is only `GrassGround.cs` (green plane) + `SkyGrid.cs` (clouds). Add real 3D ground props — buildings, trees, landmarks — so there's a believable scene to descend toward. Watch Quest 2 performance: low-poly assets, GPU instancing / LOD, and keep props near the landing zone. |
+| Skydiver/canopy movement via Matlab physics | TBD | HIGH | Drive the avatar+canopy **translation through the world** from the Matlab pipeline (`Matlab/animate_to_unity.m` UDP stream + `EOM_Solver.dll` on the lab Windows PC) instead of the pure-C# placeholder in `PlayerMovement.cs`. XSens supplies pose; position/physics comes from the Matlab/EOM stream. Wire the canopy Rigidbody, confirm the UDP path (127.0.0.1), and verify on the lab Windows machine (DLL is Windows-only). |
 | Assign SkyboxGrass material in Unity | Sari | LOW | Window → Rendering → Lighting → Skybox Material → drag in Assets/Materials/SkyboxGrass.mat. Fixes horizon color mismatch. |
 
 ---

@@ -182,11 +182,17 @@ Draws a pulsing orange bullseye on the ground as the target landing zone. Attach
 SkydiverSimulator_AmirSari/
 ├── Assets/
 │   ├── Canopy.obj              — wrong orientation, don't use
-│   ├── Canopy_Rotated.obj      — correct canopy mesh (arch curves up)
-│   ├── CameraFollow.cs         — camera tracks avatar
-│   ├── SuspensionLines.cs      — lines from canopy to shoulders
-│   ├── SkyGrid.cs              — floating sphere grid
-│   ├── PlayerMovement.cs       — physics via EOM_Solver (Windows only, no-op on Mac/Quest)
+│   ├── Canopy_Rotated.obj      — old static canopy mesh (arch curves up)
+│   ├── ProceduralCanopy.cs     — builds the ram-air canopy at runtime (cells, slider, pilot chute, suspension + steering lines, toggle grips); has a right-click "Bake Canopy" workflow
+│   ├── ToggleArmAnimation.cs   — swings the avatar arms to the toggle input (Quest triggers / A,D,Space)
+│   ├── VRCameraRig.cs          — first-person Quest 2 camera (head-tracked via XRNode.Head)
+│   ├── CameraFollow.cs         — third-person chase camera (tracks avatar, offset behind/above)
+│   ├── SuspensionLines.cs      — (legacy) lines from canopy to shoulders
+│   ├── SkyGrid.cs              — fluffy puff-sphere cloud layer (follows avatar in XZ, fixed altitude)
+│   ├── GrassGround.cs          — green ground plane + horizon blend
+│   ├── DestinationArrow.cs     — nav arrow that points at a draggable destination
+│   ├── SkydiverHUD.cs          — ALT / SPD / HDG world-space overlay
+│   ├── PlayerMovement.cs       — physics via EOM_Solver (Windows only) / pure-C# fallback on Mac/Quest
 │   ├── VelocityArrows.cs       — cyan/yellow velocity direction arrows on canopy
 │   ├── WindEffect.cs           — cloud-sphere wind particles (sense of descent)
 │   ├── LandingZoneMarker.cs    — pulsing orange bullseye target on ground
@@ -194,11 +200,23 @@ SkydiverSimulator_AmirSari/
 │   │   └── EOM_Solver.dll      — aerodynamics engine (Windows only)
 │   ├── Integration_Ready.unity — main scene
 │   └── Scenes/                 — default Unity scenes
+├── Matlab/                     — animate_to_unity.m (XSens→UDP→Unity), load_mvnx.m, .mvnx capture
 ├── README.md                   — this file
+├── HANDOFF.md                  — running status / handoff between sessions
 ├── TASKS.md                    — task tracking for both AI agents
 └── ProjectSettings/
     └── ...
 ```
+
+---
+
+## Roadmap / upcoming (as of 2026-06-17)
+
+See `TASKS.md` for details. Next planned work on Project 2:
+
+1. **First/third-person camera switcher** — runtime toggle between `VRCameraRig.cs` (first-person, head-tracked) and `CameraFollow.cs` (third-person chase).
+2. **Richer environment** — add real 3D ground props (buildings, trees, landmarks) on top of `GrassGround.cs` + `SkyGrid.cs`, mindful of Quest 2 performance.
+3. **Skydiver/canopy movement via the Matlab physics** — drive the avatar+canopy translation through the world from the Matlab pipeline (`animate_to_unity.m` UDP + `EOM_Solver.dll` on the lab PC) instead of the pure-C# placeholder.
 
 ---
 

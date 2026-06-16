@@ -1,5 +1,5 @@
 # HANDOFF — SkydiverSimulator (VR Parachute, Quest 2)
-**Last updated: 2026-05-31 (Sari)**
+**Last updated: 2026-06-17 (Sari)**
 
 ---
 
@@ -50,6 +50,30 @@ git pull
 | Restart mid-flight or after landing | ✓ added 2026-05-26 — A button (Quest) / R key (Editor) |
 | Wind particles follow direction of travel | ✓ fixed 2026-05-26 — combined up + backward drift in WindEffect |
 | Destination arrow (nav indicator) | ✓ added 2026-05-31 — DestinationArrow.cs, floats in front of avatar, points at draggable target |
+| Procedural ram-air canopy | ✓ added 2026-06-14 — ProceduralCanopy.cs builds the whole canopy at runtime (cells, slider, pilot chute, suspension lines), with a right-click "Bake Canopy" workflow that saves the static parts into the scene |
+| Steering lines attach to the hands | ✓ fixed 2026-06-16 — cables now target the real skinned hand bones (`LeftCarpus 1`/`RightCarpus 1`). See "Avatar has duplicate bones" note below |
+| Steering toggle grips | ✓ added 2026-06-16 — a small grip in each hand at the bottom of the steering lines (`showToggleHandles` on ProceduralCanopy) |
+| Suspension/steering line thickness | ✓ fixed 2026-06-16 — `lineWidth` 0.006 → 0.035 so thin lines stop rendering dashed at distance |
+
+---
+
+## Next / planned (as of 2026-06-17)
+
+| Task | Priority | Notes |
+|------|----------|-------|
+| First/third-person camera switcher | MED | Toggle between `VRCameraRig.cs` (first-person, head-tracked) and `CameraFollow.cs` (third-person chase). Add a Quest button + Editor key to switch at runtime. |
+| Richer environment (buildings, trees, props) | MED | Add real 3D ground props on top of `GrassGround.cs` + `SkyGrid.cs`. Keep Quest 2 perf in mind (low-poly, LOD, instancing). |
+| Skydiver/canopy movement via Matlab physics | HIGH | Drive avatar+canopy translation from the Matlab pipeline (`animate_to_unity.m` UDP + `EOM_Solver.dll` on the lab PC) instead of the pure-C# placeholder. Verify on the lab Windows machine. |
+
+---
+
+## Avatar has duplicate bones (important for any bone attachment)
+
+The imported avatar contains **two copies of every arm/hand bone**:
+- **Real skinned/animated bones** — nested under `Hips`, given a `" 1"` suffix by Unity to de-dupe the name (`Avatar/Hips/.../LeftShoulder 1/LeftElbow/LeftCarpus 1`). These move with the visible mesh; in the T-pose they spread along world **X** (`LeftCarpus 1` at X≈-0.79, `RightCarpus 1` at X≈+0.79).
+- **Flat reference nodes** — parented directly under `Avatar` (`Avatar/LeftCarpus`, `Avatar/jLeftWrist`, the `p*` landmarks). These sit at the torso (X≈0) and **never move**.
+
+When attaching anything to a hand/arm (cables, IK, `ToggleArmAnimation.cs`), target the **Hips-rooted `" 1"` bone**, not the flat `Avatar/<name>` / `j*` copy. `ProceduralCanopy.FindSkinnedBone()` does this automatically (matches the name ignoring a trailing `" 1"` and prefers the copy with a `Hips` ancestor).
 
 ---
 
