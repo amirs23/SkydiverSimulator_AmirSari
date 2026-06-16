@@ -12762,7 +12762,7 @@ MonoBehaviour:
   rightShoulder: {fileID: 629398628}
   leftHand: {fileID: 1787040364}
   rightHand: {fileID: 696473126}
-  lineWidth: 0.006
+  lineWidth: 0.035
   suspColor: {r: 1, g: 1, b: 1, a: 1}
   steeringColor: {r: 1, g: 0.8, b: 0, a: 1}
   pilotRadius: 0.16

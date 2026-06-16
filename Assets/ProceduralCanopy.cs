@@ -99,7 +99,9 @@ public class ProceduralCanopy : MonoBehaviour
 
     // ── Line appearance ───────────────────────────────────────────────────────
     [Header("Suspension Lines")]
-    public float lineWidth     = 0.006f;
+    [Tooltip("Base line width (metres). Risers render at 2× this. Keep above ~0.015 so the " +
+             "lines don't go sub-pixel and look dashed when viewed from a distance.")]
+    public float lineWidth     = 0.035f;
     public Color suspColor     = Color.white;
     [Tooltip("Steering lines are coloured differently to distinguish them.")]
     public Color steeringColor = new Color(1f, 0.8f, 0f);   // yellow
