@@ -1,5 +1,5 @@
 # TASKS — SkydiverSimulator
-**Last updated: 2026-06-14 (Sari) — ProceduralCanopy + bake workflow; steering-line hand attachment blocked (see In Progress)**
+**Last updated: 2026-06-16 (Sari) — steering-line hand attachment fix applied (skinned bones LeftCarpus/RightCarpus); needs in-Editor confirmation (see In Progress)**
 **Amir's AI**: Claude (claude-sonnet-4-6)
 **Sari's AI**: Claude (claude-sonnet-4-6)
 
@@ -41,7 +41,7 @@
 
 | Task | Assigned to | Notes |
 |------|-------------|-------|
-| Steering lines → hands (visual cable) | Sari (2026-06-14) | **BLOCKED on bone location.** ProceduralCanopy builds the chute + cables; bake workflow added (right-click component → Bake Canopy). Yellow steering cables won't reach the hands. Diagnosed with `showHandMarkers`: magenta markers sit at the TORSO, not the hands — `jLeftWrist`/`jRightWrist` are NOT co-located with the visible hands, even WITH the XSens stream active. Next: find the transform that actually sits at the visible hand (real skinning bone) and assign it; check Avatar scale; check for two skeletons. Full write-up in README → "KNOWN ISSUE — steering lines don't reach the hands". Debug logs + markers still ON. |
+| Steering lines → hands (visual cable) | Sari (2026-06-16) | **DONE.** Avatar has TWO copies of each arm bone: real skinned ones are nested under `Hips` with a `" 1"` suffix (`LeftCarpus 1` at X=-0.79 = visible hand); flat copies under `Avatar/` sit at the torso and never move. `ProceduralCanopy.FindSkinnedBone()` matches the name ignoring a trailing `" 1"` and prefers the copy with a `Hips` ancestor → resolves to `LeftCarpus 1`/`RightCarpus 1`. Confirmed cables + markers sit on the hands and follow live. Debug markers/diagnostics removed; replaced with steering-toggle grips in each hand (`showToggleHandles`). See README → "FIXED — steering lines now attach to the hands". |
 
 ## To Do — Project 2 (VR Parachute)
 

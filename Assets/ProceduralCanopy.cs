@@ -77,12 +77,24 @@ public class ProceduralCanopy : MonoBehaviour
     public Vector3 followOffset = new Vector3(0f, 7f, 0f);
 
     // ── Bone references ───────────────────────────────────────────────────────
+    // IMPORTANT: this XSens avatar has THREE parallel node hierarchies:
+    //   • CamelCase bones (LeftCarpus, LeftShoulder, LeftElbow …) — the skeleton the
+    //     mesh is actually SKINNED to. These move the visible body.
+    //   • j* joints (jLeftWrist, jLeftShoulder …) — XSens reference joints that are
+    //     NOT skinned and sit detached at the rig root (near the torso). Attaching
+    //     cables here makes them stop short of the hands — this was the long-standing
+    //     "steering lines don't reach the hands" bug.
+    //   • p* palpation landmarks (pLeftTopOfHand …) — surface reference points.
+    // We always resolve to the SKINNED bones below, ignoring any j*/non-skinned
+    // assignment left over in the scene.
     [Header("Bones — drag from Avatar skeleton")]
+    [Tooltip("Skinned shoulder bone. Leave empty to auto-find 'LeftShoulder'.")]
     public Transform leftShoulder;
+    [Tooltip("Skinned shoulder bone. Leave empty to auto-find 'RightShoulder'.")]
     public Transform rightShoulder;
-    [Tooltip("Left hand / toggle grip point.")]
+    [Tooltip("Left hand / toggle grip point. Use the SKINNED 'LeftCarpus' bone — NOT jLeftWrist.")]
     public Transform leftHand;
-    [Tooltip("Right hand / toggle grip point.")]
+    [Tooltip("Right hand / toggle grip point. Use the SKINNED 'RightCarpus' bone — NOT jRightWrist.")]
     public Transform rightHand;
 
     // ── Line appearance ───────────────────────────────────────────────────────
@@ -117,11 +129,16 @@ public class ProceduralCanopy : MonoBehaviour
     readonly List<LineRenderer> _riserLines = new List<LineRenderer>();  // FL, FR, RL, RR
     readonly List<LineRenderer> _steerLines = new List<LineRenderer>();  // L×2, R×2
 
-    [Header("Debug")]
-    [Tooltip("Spawn bright magenta spheres at the hand bones the code is reading, so you " +
-             "can see exactly where it thinks the hands are. Turn off once aligned.")]
-    public bool showHandMarkers = true;
-    Transform _markL, _markR;
+    [Header("Toggle Handles")]
+    [Tooltip("Show a small steering-toggle grip in each hand, at the bottom of the steering lines.")]
+    public bool showToggleHandles = true;
+    [Tooltip("Colour of the toggle grips.")]
+    public Color handleColor = new Color(0.05f, 0.05f, 0.05f);
+    [Tooltip("Length of each grip (metres).")]
+    public float handleLength = 0.13f;
+    [Tooltip("Radius of each grip (metres).")]
+    public float handleRadius = 0.022f;
+    Transform _handleL, _handleR;
 
     // =========================================================================
     // LIFECYCLE
@@ -144,50 +161,68 @@ public class ProceduralCanopy : MonoBehaviour
     // the follow target (the Avatar) so the cables still attach correctly.
     void ResolveBones()
     {
-        leftShoulder  = Resolve(leftShoulder,  "jLeftShoulder");
-        rightShoulder = Resolve(rightShoulder, "jRightShoulder");
-        leftHand      = Resolve(leftHand,      "jLeftWrist",  "jLeftHand");
-        rightHand     = Resolve(rightHand,     "jRightWrist", "jRightHand");
-
-        Debug.Log("[ProceduralCanopy] Bones — " +
-                  $"LSh:{(leftShoulder ? "ok" : "NULL")} " +
-                  $"RSh:{(rightShoulder ? "ok" : "NULL")} " +
-                  $"LHand:{(leftHand ? "ok" : "NULL")} " +
-                  $"RHand:{(rightHand ? "ok" : "NULL")}");
-
-        if (leftHand)  Debug.Log($"[ProceduralCanopy] leftHand  '{leftHand.name}'  worldPos={leftHand.position}  (path: {Path(leftHand)})");
-        if (rightHand) Debug.Log($"[ProceduralCanopy] rightHand '{rightHand.name}' worldPos={rightHand.position} (path: {Path(rightHand)})");
-        Debug.Log($"[ProceduralCanopy] canopy worldPos={transform.position}");
+        // Prefer the SKINNED bones (CamelCase). Names are searched in priority order;
+        // the j* fallbacks are detached reference joints used only if nothing better
+        // is found. We search BY NAME first and only keep the Inspector assignment if
+        // the search comes up empty, so a stale/wrong slot can't override the fix.
+        leftShoulder  = ResolveSkinned(leftShoulder,  "LeftShoulder",  "LeftCollar",  "jLeftShoulder");
+        rightShoulder = ResolveSkinned(rightShoulder, "RightShoulder", "RightCollar", "jRightShoulder");
+        leftHand      = ResolveSkinned(leftHand,      "LeftCarpus",  "LeftHand",  "jLeftWrist");
+        rightHand     = ResolveSkinned(rightHand,     "RightCarpus", "RightHand", "jRightWrist");
     }
 
-    static string Path(Transform t)
+    // Resolve a bone reference to the SKINNED bone that actually moves the visible mesh.
+    //
+    // This XSens avatar imports TWO copies of each bone:
+    //   • the real skinned/animated bone, nested under Hips (e.g.
+    //     Hips/.../LeftShoulder 1/LeftElbow/LeftCarpus 1) — note the " 1" suffix Unity
+    //     adds to de-duplicate the name. These spread along X with the T-pose.
+    //   • a flat reference node parented directly under the Avatar root (e.g.
+    //     Avatar/LeftCarpus, Avatar/jLeftWrist) that sits at the torso and never moves.
+    // We therefore match each candidate name ignoring a trailing " 1"/" 2"… and PREFER
+    // the copy that has a "Hips" ancestor, so cables attach to the visible limb.
+    Transform ResolveSkinned(Transform assigned, params string[] names)
     {
-        string p = t.name;
-        while (t.parent != null) { t = t.parent; p = t.name + "/" + p; }
-        return p;
-    }
-
-    Transform Resolve(Transform assigned, params string[] names)
-    {
-        if (assigned != null) return assigned;            // valid reference — keep it
-        Transform searchRoot = followTarget != null ? followTarget : transform;
         foreach (var n in names)
         {
-            var found = FindDeep(searchRoot, n);
+            var found = FindSkinnedBone(n);
             if (found != null) return found;
         }
-        return assigned;
+        return assigned;                                  // nothing found — keep what we had
     }
 
-    static Transform FindDeep(Transform root, string name)
+    Transform FindSkinnedBone(string wanted)
     {
-        if (root.name == name) return root;
-        for (int i = 0; i < root.childCount; i++)
+        Transform searchRoot = followTarget != null ? followTarget : transform;
+        Transform anyMatch = null;
+        foreach (var t in searchRoot.GetComponentsInChildren<Transform>(true))
         {
-            var r = FindDeep(root.GetChild(i), name);
-            if (r != null) return r;
+            if (!NameMatches(t.name, wanted)) continue;
+            if (HasAncestorNamed(t, "Hips")) return t;    // the real skinned bone — prefer it
+            anyMatch ??= t;                               // remember a fallback (e.g. detached ref)
         }
-        return null;
+        return anyMatch;
+    }
+
+    // True if 'actual' equals 'wanted', or equals 'wanted' with a trailing " <digits>"
+    // that Unity appends to disambiguate duplicate node names ("LeftCarpus 1").
+    static bool NameMatches(string actual, string wanted)
+    {
+        if (actual == wanted) return true;
+        if (actual.Length > wanted.Length && actual.StartsWith(wanted) && actual[wanted.Length] == ' ')
+        {
+            for (int i = wanted.Length + 1; i < actual.Length; i++)
+                if (!char.IsDigit(actual[i])) return false;
+            return true;
+        }
+        return false;
+    }
+
+    static bool HasAncestorNamed(Transform t, string name)
+    {
+        for (Transform p = t.parent; p != null; p = p.parent)
+            if (p.name == name) return true;
+        return false;
     }
 
     void LateUpdate()
@@ -502,23 +537,27 @@ public class ProceduralCanopy : MonoBehaviour
         for (int i = 0; i < 4; i++)
             _steerLines.Add(MakeLR(root, "Steer", steeringColor, lineWidth, 2, worldSpace: true));
 
-        if (showHandMarkers)
+        if (showToggleHandles)
         {
-            _markL = MakeMarker(root, "HandMarkerL");
-            _markR = MakeMarker(root, "HandMarkerR");
+            _handleL = MakeToggleHandle(root, "ToggleHandleL");
+            _handleR = MakeToggleHandle(root, "ToggleHandleR");
         }
     }
 
-    Transform MakeMarker(Transform root, string name)
+    // A small cylindrical steering-toggle grip held in the hand at the bottom of the
+    // steering lines. Positioned and oriented along the cable each frame (see UpdateDynamicLines).
+    Transform MakeToggleHandle(Transform root, string name)
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         go.name = name;
         go.transform.SetParent(root, false);
-        go.transform.localScale = Vector3.one * 0.18f;
-        SafeDestroy(go.GetComponent<SphereCollider>());
+        // Unity's cylinder is 2 units tall along local Y; scale to handleLength × handleRadius.
+        go.transform.localScale = new Vector3(handleRadius * 2f, handleLength * 0.5f, handleRadius * 2f);
+        SafeDestroy(go.GetComponent<Collider>());
         var mr  = go.GetComponent<MeshRenderer>();
         var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = Color.magenta;
+        mat.color = handleColor;
+        mat.SetFloat("_Smoothness", 0.2f);
         mr.sharedMaterial = mat;
         return go.transform;
     }
@@ -526,8 +565,6 @@ public class ProceduralCanopy : MonoBehaviour
     void UpdateDynamicLines()
     {
         if (_riserLines.Count < 4 || _steerLines.Count < 4) return;
-
-        float cellW = span / cellCount;
 
         // Slider corners in world space
         Vector3 slFL = transform.TransformPoint(SL_FL());
@@ -561,8 +598,18 @@ public class ProceduralCanopy : MonoBehaviour
         SetSteerCable(_steerLines[2], rH, -0.12f);
         SetSteerCable(_steerLines[3], rH,  0.12f);
 
-        if (_markL) _markL.position = lH;
-        if (_markR) _markR.position = rH;
+        if (_handleL) PlaceToggleHandle(_handleL, lH);
+        if (_handleR) PlaceToggleHandle(_handleR, rH);
+    }
+
+    // Sit the grip at the hand and align its long axis up along the steering line
+    // (toward the canopy), so it reads as a toggle the hand is holding.
+    void PlaceToggleHandle(Transform handle, Vector3 handWorld)
+    {
+        Vector3 toCanopy = transform.position - handWorld;
+        if (toCanopy.sqrMagnitude < 1e-6f) toCanopy = Vector3.up;
+        handle.position = handWorld;
+        handle.rotation = Quaternion.FromToRotation(Vector3.up, toCanopy.normalized);
     }
 
     // =========================================================================

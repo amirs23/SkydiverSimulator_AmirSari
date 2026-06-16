@@ -149,22 +149,24 @@ Builds a full ram-air parachute at runtime (cells, slider, pilot chute, suspensi
 ### `ToggleArmAnimation.cs`
 Animates the avatar's arms to match toggle input (visual only). Neutral = arms raised to the toggles; pulling left/right trigger swings that arm down toward the hip; both = full brake. Reads `PlayerMovement.LeftToggle`/`RightToggle`, falls back to direct XR trigger and keyboard (A/D/Space). Attach to the Avatar, drag in `jLeftShoulder`/`jLeftElbow` and `jRightShoulder`/`jRightElbow`. Tune Raised/Pulled Euler offsets in Inspector.
 
-### ⚠️ KNOWN ISSUE — steering lines don't reach the hands (open, picked up next session)
+### ✅ FIXED 2026-06-16 — steering lines now attach to the hands
 **Goal:** the yellow steering cables should visually connect to the avatar's hands and follow them, so pulling looks like steering (purely cosmetic; we do NOT move the avatar).
 
-**What we tried (all in `ProceduralCanopy.cs`):**
-1. Confirmed the Inspector hand slots resolve OK at runtime (`ResolveBones()` logs `LHand:ok RHand:ok`).
-2. Tried routing steering lines through the slider corners → they cut across to the body, because the canopy's wingspan runs along **world X** but the avatar's hands sit on **world Z** (hands logged at `(0, 1.40, ±0.78)` — both X=0).
-3. Tried rotating the canopy to align span with the shoulders → broke layout (avatar root has a non-identity rotation; compounding threw the canopy off). **Reverted — rotation code fully removed.**
-4. Current approach: each steering line is a near-vertical cable from the canopy underside straight down to the hand (`SetSteerCable`). Cleaner, but still ends short of the hands.
+**Confirmed root cause (from a runtime bone dump):** the imported avatar contains **two copies of every arm/hand bone**, and the cables were grabbing the wrong copy:
+- **Real skinned/animated bones** — nested under `Hips` and given a `" 1"` suffix by Unity to de-duplicate the name. These move with the visible mesh and spread along **world X** in the T-pose:
+  - `LeftCarpus 1` at `(-0.79, 1.38, -0.01)`, `RightCarpus 1` at `(0.79, …)` — the visible hands.
+  - path: `Avatar/Hips/Chest/…/LeftCollar/LeftShoulder 1/LeftElbow/LeftCarpus 1`
+- **Flat reference nodes** — parented directly under `Avatar` (`Avatar/LeftCarpus`, `Avatar/jLeftWrist`, `Avatar/LeftForeArm`, the `p*` landmarks). These sit at the torso centre (X≈0, spread on Z) and **never move**. Targeting any of these is why the markers + cables stayed pinned to the chest.
 
-**Root cause found (via `showHandMarkers`):** the magenta markers — placed exactly at `jLeftWrist`/`jRightWrist` — sit at the **torso/center**, NOT at the visible hands. The assigned wrist bones are not co-located with the visible hands. Tested **with the XSens/Matlab stream active and the markers STILL stayed at the torso** (so it is not just an un-streamed bind-pose artifact).
+A plain name search for `"LeftCarpus"` matched the flat copy first — that was the bug.
 
-**Next steps to try:**
-- In Play mode, expand the Avatar in the Hierarchy and click each bone to find which transform actually sits at the visible hand (the SkinnedMeshRenderer's real skinning bone may differ from `jLeftWrist`). Assign THAT to Left/Right Hand.
-- Check the Avatar (and any parent) Transform **scale** — a scaled rig makes bone world-positions not match the rendered mesh.
-- Confirm there aren't two skeletons (an XSens segment hierarchy vs. the mesh's skinning skeleton); the path was `Avatar/jLeftWrist` — verify the mesh is skinned to those same bones.
-- The diagnostic `Debug.Log` lines in `ResolveBones()` and the `showHandMarkers` spheres are still ON — keep them until the hands line up, then remove.
+**Fix in `ProceduralCanopy.cs`:** `ResolveBones()` → `FindSkinnedBone()` matches the candidate name **ignoring a trailing `" 1"`/`" 2"`…** (`NameMatches`) and **prefers the copy that has a `Hips` ancestor** (`HasAncestorNamed`). So hands resolve to `LeftCarpus 1`/`RightCarpus 1` and shoulders to `LeftShoulder 1`/`RightShoulder 1` — the bones that actually track the mesh. The canopy span is on X and the real hands are on X, so the near-vertical `SetSteerCable` cables now reach them.
+
+**Status:** confirmed working — markers sat on the hands and the cables follow the hand live each `LateUpdate` (`[DefaultExecutionOrder(10000)]` makes the cables read the post-pose bone positions). The debug magenta spheres + console diagnostics have been removed.
+
+**Steering toggles:** each hand now shows a small steering-toggle grip at the bottom of the steering lines (`showToggleHandles`, `handleColor`/`handleLength`/`handleRadius` in the Inspector) instead of the old debug markers. Set `showToggleHandles = false` to hide them.
+
+**Note (likely same bug in `ToggleArmAnimation.cs`):** its tooltips suggest `jLeftArm`/`LeftUpperArm`/`LeftForeArm` — all flat non-moving reference nodes. To animate the visible arm it must drive the skinned `" 1"` bones (`LeftShoulder 1` / `LeftElbow` / etc.). Worth re-checking its Inspector slots.
 
 ### `LandingZoneMarker.cs`
 Draws a pulsing orange bullseye on the ground as the target landing zone. Attach to a new empty GameObject and position it where you want the target.
