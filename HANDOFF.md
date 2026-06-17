@@ -57,6 +57,7 @@ git pull
 | First/third-person camera switcher | ◐ code done 2026-06-17, **not yet tested on Quest** — `CameraViewController.cs` (see below) |
 | Richer environment (town + trees) | ◐ baker done 2026-06-17, **not yet tuned/tested on Quest** — `GroundEnvironment.cs` (see below) |
 | Tunable spawn altitude | ✓ added 2026-06-17 — `startHeight` field on `PlayerMovement` (was hardcoded 500m); lower it to test near the ground |
+| Matlab-driven movement (UDP) | ◐ connection working 2026-06-17 — `SimulatorReceiver.cs` + `Matlab/sim_to_unity.m`. Stream is live; **rotation/coordinate-frame mapping still needs tuning** (see below) |
 
 ---
 
@@ -82,6 +83,23 @@ New `Assets/GroundEnvironment.cs` — attach to an empty `Environment` object at
 Design choices (per Sari): NOT a runtime chunk streamer — everything is placed up front so it's all visible from 500m with no pop-in. Keeps a clear landing circle around origin; props reuse a few shared URP/Lit materials + primitive meshes, colliders stripped, flagged Static for batching. Auto-raises `Camera.main` far-clip to 3000 + adds linear fog at launch so distant ground renders from altitude. Counts (~280 buildings / ~1400 trees), `areaHalfExtent`, `townHalfExtent`, `seed` all tunable.
 
 **STILL TODO:** generate + save in the scene, then tune density/area and **test framerate on Quest 2** (lower counts if it dips). Confirm the VR rig camera is tagged `MainCamera` (or the far-clip bump won't apply).
+
+---
+
+## Matlab-driven movement (SimulatorReceiver.cs, 2026-06-17)
+
+New `Assets/SimulatorReceiver.cs` — UDP receiver that replaces PlayerMovement's physics; Unity becomes a pure renderer of the lab/Matlab state. Listens on port **9764** (separate from the XSens skeleton stream on 9763, so both run at once). Each frame it applies canopy + skydiver position / orientation / linear+angular velocity to the Rigidbodies, stores wind (`SimulatorReceiver.Wind`), and feeds right/left steering into `PlayerMovement.SetToggles()` → existing `ToggleArmAnimation` converts those to shoulder pitch (arms up at 0, down at 1). It disables `PlayerMovement` so the two don't fight.
+
+**Wire protocol:** one UDP datagram = an ASCII line of 29 comma-separated numbers (canopy pos/ori/linvel/angvel, skydiver pos/ori/linvel/angvel, wind, right+left steer). Full field order documented at the top of `SimulatorReceiver.cs` and `Matlab/sim_to_unity.m`.
+
+**Test sender:** `Matlab/sim_to_unity.m` flies a 60s spiral descent with oscillating steering. Run it after pressing Play in Unity (set `SimulatorReceiver` port = 9764, wire canopy/body/playerMovement).
+
+**Setup:** add `SimulatorReceiver` to a GameObject, drag in the canopy + body Rigidbodies and the `PlayerMovement` component.
+
+**STILL TODO (2026-06-17 — connection confirmed working, but):**
+- **Rotation/coordinate-frame mapping needs tuning.** `frameMode` defaults to `EnuZupAerospace` (RH, Z-up, aerospace yaw/pitch/roll) → converted in `ConvPos`/`ConvRot`. Confirm the REAL lab/EOM output frame (likely NED or other) and fix the axis/sign mapping. Positions looked OK; orientations were off.
+- Decide who drives the **arms** when XSens is also connected — XSens mocap and `ToggleArmAnimation` both write the arm bones and will fight. Pick one (see "both connections at once" discussion).
+- Verify on the lab Windows PC against the real `EOM_Solver` stream.
 
 ---
 

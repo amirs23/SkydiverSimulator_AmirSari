@@ -23,6 +23,17 @@ public class PlayerMovement : MonoBehaviour
     public static float LeftToggle   { get; private set; }
     public static float RightToggle  { get; private set; }
 
+    // Lets an external driver (e.g. SimulatorReceiver, fed from Matlab) set the
+    // steering toggles so ToggleArmAnimation / ProceduralCanopy / steering lines
+    // react without this script's own physics running. BrakeLevel tracks the
+    // symmetric pull so the HUD's BRK indicator still works.
+    public static void SetToggles(float left, float right)
+    {
+        LeftToggle  = Mathf.Clamp01(left);
+        RightToggle = Mathf.Clamp01(right);
+        BrakeLevel  = Mathf.Min(LeftToggle, RightToggle);
+    }
+
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
     [DllImport("EOM_Solver")]
     private static extern void EOM_Solver_Native(
