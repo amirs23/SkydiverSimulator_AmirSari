@@ -13,6 +13,11 @@ public class PlayerMovement : MonoBehaviour
     public Rigidbody rbBody;
     public Transform playerTransform;
 
+    [Header("Spawn")]
+    [Tooltip("Canopy spawn altitude (m). Lower it to test near the ground/environment; " +
+             "the body spawns 5m below. Only applied when the object starts below y=10.")]
+    public float startHeight = 500f;
+
     // Read by SkydiverHUD / ToggleArmAnimation every frame.
     public static float BrakeLevel   { get; private set; }
     public static float LeftToggle   { get; private set; }
@@ -155,13 +160,13 @@ public class PlayerMovement : MonoBehaviour
         {
             rbCanopy.useGravity = false;
             if (rbCanopy.position.y < 10f)
-                rbCanopy.position = new Vector3(rbCanopy.position.x, 500f, rbCanopy.position.z);
+                rbCanopy.position = new Vector3(rbCanopy.position.x, startHeight, rbCanopy.position.z);
         }
         if (rbBody != null)
         {
             rbBody.useGravity = false;
             if (rbBody.position.y < 10f)
-                rbBody.position = new Vector3(rbBody.position.x, 495f, rbBody.position.z);
+                rbBody.position = new Vector3(rbBody.position.x, startHeight - 5f, rbBody.position.z);
         }
 
         // Auto-position landing zone using actual canopy heading.

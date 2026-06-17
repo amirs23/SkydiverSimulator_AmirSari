@@ -55,6 +55,8 @@ git pull
 | Steering toggle grips | ✓ added 2026-06-16 — a small grip in each hand at the bottom of the steering lines (`showToggleHandles` on ProceduralCanopy) |
 | Suspension/steering line thickness | ✓ fixed 2026-06-16 — `lineWidth` 0.006 → 0.035 so thin lines stop rendering dashed at distance |
 | First/third-person camera switcher | ◐ code done 2026-06-17, **not yet tested on Quest** — `CameraViewController.cs` (see below) |
+| Richer environment (town + trees) | ◐ baker done 2026-06-17, **not yet tuned/tested on Quest** — `GroundEnvironment.cs` (see below) |
+| Tunable spawn altitude | ✓ added 2026-06-17 — `startHeight` field on `PlayerMovement` (was hardcoded 500m); lower it to test near the ground |
 
 ---
 
@@ -70,6 +72,16 @@ New `Assets/CameraViewController.cs` on the Main Camera. Keeps the head-tracked 
 **Inspector wiring on Main Camera:** add `CameraViewController` → drag in `vrCameraRig`, `cameraFollow`, and `firstPersonBone` (= `Head 1`).
 
 **STILL TODO:** verify on the Quest 2 headset — confirm B toggles, first person sits at the eyes, third person frames the full canopy (tune `thirdPersonOffset`). Editor first-person facing may need `firstPersonEuler` tuning but that does not affect the headset.
+
+---
+
+## Richer environment (GroundEnvironment.cs, 2026-06-17)
+
+New `Assets/GroundEnvironment.cs` — attach to an empty `Environment` object at the world origin. Right-click the component header → **"Generate Environment"** scatters a low-poly **town (center) + fields of trees** across most of the map into a saved `EnvironmentBaked` child, then Cmd+S to keep it. **"Clear Environment"** to regenerate (change `seed` for a new layout).
+
+Design choices (per Sari): NOT a runtime chunk streamer — everything is placed up front so it's all visible from 500m with no pop-in. Keeps a clear landing circle around origin; props reuse a few shared URP/Lit materials + primitive meshes, colliders stripped, flagged Static for batching. Auto-raises `Camera.main` far-clip to 3000 + adds linear fog at launch so distant ground renders from altitude. Counts (~280 buildings / ~1400 trees), `areaHalfExtent`, `townHalfExtent`, `seed` all tunable.
+
+**STILL TODO:** generate + save in the scene, then tune density/area and **test framerate on Quest 2** (lower counts if it dips). Confirm the VR rig camera is tagged `MainCamera` (or the far-clip bump won't apply).
 
 ---
 
