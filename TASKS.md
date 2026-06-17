@@ -34,6 +34,7 @@
 | Destination arrow (nav indicator) | Sari (2026-05-31) | DestinationArrow.cs — arrow floats in front of avatar, points toward a draggable destination target. All fields Inspector-configurable: avatar ref, destination ref, local offset (position on avatar), shaft length, line width, head fraction, color. Add empty GameObject → Add Component → DestinationArrow → drag Avatar + destination target. |
 | Grass ground | Sari (2026-05-31) | GrassGround.cs — attach to Plane. Auto-scales plane to 2000x, applies green URP/Lit material, sets skybox ground color for horizon blend. |
 | Cloud layer (SkyGrid rewrite) | Sari (2026-05-31) | SkyGrid.cs rewritten — fluffy puff-sphere cloud clusters, fixed Y altitude, follows avatar in XZ. Avatar start height raised to 500m. |
+| First/third-person camera switcher (code) | Sari (2026-06-17) | `CameraViewController.cs` on Main Camera. Keeps head-tracked `VRCameraRig` active in BOTH views (look-around always works); toggling only changes follow target + offset (does NOT switch to `CameraFollow`'s LookAt, which would fight the HMD). First person follows a dragged head bone (`Head 1`); third person pulls back to `thirdPersonOffset` to frame the full canopy. Toggle: V (Editor) / Quest **B** / `Instance.SetView(bool)` for a future UDP flag. Desktop fallback drives the camera so V works without a headset (`firstPersonEuler` corrects Editor-only facing). **NOT yet tested on Quest** — see "In Progress". |
 | Steering lines → hands + toggle grips + line thickness | Sari (2026-06-16) | ProceduralCanopy steering cables now attach to the real skinned hand bones. **Key gotcha:** the avatar imports TWO copies of each arm bone — flat copies under `Avatar/` (`Avatar/LeftCarpus`, `jLeftWrist`) sit at the torso and never move; the real Hips-rooted copies carry a `" 1"` suffix (`LeftCarpus 1` = visible hand). `FindSkinnedBone()` ignores the trailing `" 1"` and prefers the `Hips`-rooted copy. Replaced the magenta debug markers with steering-toggle grips (`showToggleHandles`). Bumped `lineWidth` 0.006 → 0.035 so the thin lines stop rendering dashed at distance. See README → "FIXED — steering lines now attach to the hands". Commits `b2ac784`, `5d16ce3`. |
 
 ---
@@ -42,13 +43,12 @@
 
 | Task | Assigned to | Notes |
 |------|-------------|-------|
-| _(none)_ | | |
+| Test camera switcher on Quest 2 | Sari | `CameraViewController.cs` is wired and works in the Editor. Put on the Quest 2 and verify: B button toggles views, first person sits at the eyes (tune `firstPersonOffset`), third person frames the whole canopy + pilot chute (tune `thirdPersonOffset`). HMD drives rotation in VR, so `firstPersonEuler` (Editor-only) is irrelevant on device. |
 
 ## To Do — Project 2 (VR Parachute)
 
 | Task | Assigned to | Priority | Notes |
 |------|-------------|----------|-------|
-| First/third-person camera switcher | TBD | MED | Toggle at runtime between **first-person** (`VRCameraRig.cs` — head-tracked, eye-level under the canopy) and **third-person** (`CameraFollow.cs` — chase cam, `offset (0,2,-6)` behind/above the avatar). Add an input (Quest button + key in Editor) that enables one camera/script and disables the other. Decide default mode on launch. |
 | Richer environment (buildings, trees, props) | TBD | MED | Today the world is only `GrassGround.cs` (green plane) + `SkyGrid.cs` (clouds). Add real 3D ground props — buildings, trees, landmarks — so there's a believable scene to descend toward. Watch Quest 2 performance: low-poly assets, GPU instancing / LOD, and keep props near the landing zone. |
 | Skydiver/canopy movement via Matlab physics | TBD | HIGH | Drive the avatar+canopy **translation through the world** from the Matlab pipeline (`Matlab/animate_to_unity.m` UDP stream + `EOM_Solver.dll` on the lab Windows PC) instead of the pure-C# placeholder in `PlayerMovement.cs`. XSens supplies pose; position/physics comes from the Matlab/EOM stream. Wire the canopy Rigidbody, confirm the UDP path (127.0.0.1), and verify on the lab Windows machine (DLL is Windows-only). |
 | Assign SkyboxGrass material in Unity | Sari | LOW | Window → Rendering → Lighting → Skybox Material → drag in Assets/Materials/SkyboxGrass.mat. Fixes horizon color mismatch. |

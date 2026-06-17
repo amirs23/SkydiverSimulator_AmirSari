@@ -54,6 +54,22 @@ git pull
 | Steering lines attach to the hands | ✓ fixed 2026-06-16 — cables now target the real skinned hand bones (`LeftCarpus 1`/`RightCarpus 1`). See "Avatar has duplicate bones" note below |
 | Steering toggle grips | ✓ added 2026-06-16 — a small grip in each hand at the bottom of the steering lines (`showToggleHandles` on ProceduralCanopy) |
 | Suspension/steering line thickness | ✓ fixed 2026-06-16 — `lineWidth` 0.006 → 0.035 so thin lines stop rendering dashed at distance |
+| First/third-person camera switcher | ◐ code done 2026-06-17, **not yet tested on Quest** — `CameraViewController.cs` (see below) |
+
+---
+
+## First/third-person camera switcher (CameraViewController.cs, 2026-06-17)
+
+New `Assets/CameraViewController.cs` on the Main Camera. Keeps the head-tracked `VRCameraRig` active in **both** views (so look-around always works) and just changes what it follows + the offset — it does NOT hand off to `CameraFollow`'s LookAt, which would fight head rotation.
+
+- **First person** (default): rig follows the `firstPersonBone` you drag in (use the real `Head 1` bone — Hips-rooted, see duplicate-bone note), at `firstPersonOffset`.
+- **Third person**: rig swaps back to `VRCameraRig.followTarget` (canopy/avatar) and pulls back to `thirdPersonOffset` (default `(0,2,-14)`) so the whole canopy + pilot chute frame.
+- **Toggle**: V key (Editor) / Quest **B** button (right controller — A is restart) / `CameraViewController.Instance.SetView(bool)` for a future Matlab UDP flag.
+- **Desktop preview**: when no HMD is present it drives the camera itself (disables `CameraFollow`) so V visibly switches in the flat Editor. `firstPersonEuler` corrects bone facing in the Editor only (try 90/-90 on X) — irrelevant in VR where the HMD drives rotation.
+
+**Inspector wiring on Main Camera:** add `CameraViewController` → drag in `vrCameraRig`, `cameraFollow`, and `firstPersonBone` (= `Head 1`).
+
+**STILL TODO:** verify on the Quest 2 headset — confirm B toggles, first person sits at the eyes, third person frames the full canopy (tune `thirdPersonOffset`). Editor first-person facing may need `firstPersonEuler` tuning but that does not affect the headset.
 
 ---
 
@@ -61,7 +77,7 @@ git pull
 
 | Task | Priority | Notes |
 |------|----------|-------|
-| First/third-person camera switcher | MED | Toggle between `VRCameraRig.cs` (first-person, head-tracked) and `CameraFollow.cs` (third-person chase). Add a Quest button + Editor key to switch at runtime. |
+| Test camera switcher on Quest 2 | MED | Code done (`CameraViewController.cs`). Put on the headset: confirm B toggles, eye position, and third-person framing; tune `thirdPersonOffset`. |
 | Richer environment (buildings, trees, props) | MED | Add real 3D ground props on top of `GrassGround.cs` + `SkyGrid.cs`. Keep Quest 2 perf in mind (low-poly, LOD, instancing). |
 | Skydiver/canopy movement via Matlab physics | HIGH | Drive avatar+canopy translation from the Matlab pipeline (`animate_to_unity.m` UDP + `EOM_Solver.dll` on the lab PC) instead of the pure-C# placeholder. Verify on the lab Windows machine. |
 
