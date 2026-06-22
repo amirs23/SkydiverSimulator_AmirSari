@@ -1,5 +1,5 @@
 # HANDOFF — SkydiverSimulator (VR Parachute, Quest 2)
-**Last updated: 2026-06-17 (Sari)**
+**Last updated: 2026-06-22 (Sari)**
 
 ---
 
@@ -57,7 +57,57 @@ git pull
 | First/third-person camera switcher | ◐ code done 2026-06-17, **not yet tested on Quest** — `CameraViewController.cs` (see below) |
 | Richer environment (town + trees) | ◐ baker done 2026-06-17, **not yet tuned/tested on Quest** — `GroundEnvironment.cs` (see below) |
 | Tunable spawn altitude | ✓ added 2026-06-17 — `startHeight` field on `PlayerMovement` (was hardcoded 500m); lower it to test near the ground |
-| Matlab-driven movement (UDP) | ◐ connection working 2026-06-17 — `SimulatorReceiver.cs` + `Matlab/sim_to_unity.m`. Stream is live; **rotation/coordinate-frame mapping still needs tuning** (see below) |
+| Matlab-driven movement (UDP) | ◐ reworked 2026-06-22 — freeze-until-stream + Sim=world/XSens=pose authority done; **canopy orientation + slider still look wrong** (see "Matlab/simulator integration" below) |
+
+---
+
+## Matlab / simulator integration (SimulatorReceiver.cs, reworked 2026-06-22)
+
+The lab simulator → Matlab → Unity UDP pipeline. `SimulatorReceiver.cs` is on the
+**PhysicsController** object (listens UDP 9764; XSens stays on 9763). Test sender:
+`Matlab/sim_to_unity.m` (spiral descent). **Run Unity Play FIRST, then the .m script.**
+
+### Confirmed design decisions (from Sari, 2026-06-22)
+- **Authority: Sim = world, XSens = pose.** The simulator's CG channel moves the whole
+  skydiver (Avatar root) through the world; XSens only articulates the limbs locally.
+  Verified safe: `Packages/com.movella.xsens/.../XsensDevice.cs` writes only bone-LOCAL
+  transforms (with `applyRootMotion` off it never touches the Avatar root's world pos),
+  so moving the root and XSens posing don't fight.
+- **Real simulator output frame (confirmed by Sari):** position is **Z-up (altitude),
+  degrees, roll/pitch/yaw**. So `Frame Mode = EnuZupAerospace` is correct (NOT RawUnity).
+
+### What was fixed this session
+1. **Nothing moves without packets.** Before the first packet the canopy + body are
+   hard-frozen (kinematic, zero velocity) and `PlayerMovement` is auto-found + disabled
+   (its glide model was spinning the rig). Re-freezes if the stream stops >
+   `streamTimeout` (0.5s). New knobs: `freezeUntilStream`, `streamTimeout`.
+2. **Rig no longer tears apart.** Root cause: the canopy was position-driven by BOTH the
+   sim AND `ProceduralCanopy`'s avatar-follow (`followTarget + 7m`, every LateUpdate).
+   Fix: while the stream is live, SimulatorReceiver sets `proceduralCanopy.followTarget =
+   null` so the sim is the sole canopy-position authority; restores it when frozen so the
+   no-stream preview still looks right. New slot: `proceduralCanopy` (auto-finds).
+3. **Removed a bogus 90° heading offset** in the rotation conversion (it assumed the
+   canopy faced Unity +X; the mesh faces +Z). Added live calibration: `headingOffsetDeg`,
+   `invertHeading`, `driveBodyRotation` (default OFF — body facing comes from XSens).
+
+### EXACT data handling (audit trail — nothing else happens)
+- Position (canopy `f[0,1,2]`, avatar `f[3,4,5]`): packet `(X,Y,Z)` → Unity `(X, Z, Y)`
+  (altitude Z → Unity up). No scale, no offset — object placed at received coords.
+- Velocity: same axis swap (HUD only).
+- Rotation: packet `(roll,pitch,yaw)` deg → `Quaternion.Euler(-pitch, -yaw+headingOffsetDeg, -roll)`.
+
+### STILL BROKEN — pick up here next session
+- **Canopy orientation still looks wrong** even with the test sender set to level
+  (`canopyRPY = [0,0,yaw]` now in `sim_to_unity.m`). "A bit better but still fucked up."
+  → If it's wrong with roll=0, the rotation conversion has a real sign/axis bug. Derive
+    the exact ENU(Z-up, deg RPY) → Unity attitude transform (proper `P·R·Pᵀ` conjugation
+    for the Y/Z axis swap), not just per-axis negation. Test against the level sender.
+- **The slider rectangle (the flat panel holding the suspension lines) doesn't look
+  right** (Sari, 2026-06-22). Investigate in `ProceduralCanopy.cs` (slider build:
+  `_sliderLocalY`, `_slHW`, `_slHD`, `MakeStaticLine` / riser attach). May be position,
+  size, or that it's not tracking the sim-driven canopy correctly while live.
+- Open question for the lab: does the **body heading** come from the sim or from XSens?
+  (`driveBodyRotation` toggles this.)
 
 ---
 
@@ -283,7 +333,7 @@ Incoming UDP data per frame (port TBD — confirm with lab team):
 
 | Task | Priority | Notes |
 |------|----------|-------|
-| New UDP receiver for lab simulator | HIGH | Replace `PlayerMovement.cs` with a new script that listens on the lab simulator UDP port and applies incoming position/orientation/velocity to the canopy and body Rigidbodies each frame. Port TBD — confirm with lab. |
+| New UDP receiver for lab simulator | ◐ IN PROGRESS | `SimulatorReceiver.cs` done: listens 9764, freeze-until-stream, Sim=world/XSens=pose authority, position confirmed correct (Z-up). **Remaining: fix canopy orientation + slider rectangle** — see "Matlab / simulator integration" section above. Confirm real port with lab. |
 | Arm animation from steering inputs | HIGH | Steering input values (left/right, 0–1) come in the simulator UDP packet. Convert to shoulder pitch: 0 = arms fully up, 1 = arms fully down along body. Apply to RightShoulder and LeftShoulder bones. Purely visual — physics effect already handled by simulator. |
 | Ground environment — trees and buildings | MEDIUM | Add trees and buildings on the ground so the skydiver can see them growing larger as they descend from 500m. Use simple procedural geometry or low-poly prefabs — no high-detail assets needed. |
 | First/third person view toggle | MEDIUM | Switch camera at runtime three ways: (1) keyboard key, (2) Meta Quest controller button (same pattern as A = restart), (3) flag received in the Matlab UDP stream. First person = camera at avatar head. Third person = current follow camera. |

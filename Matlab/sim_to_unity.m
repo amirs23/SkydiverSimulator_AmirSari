@@ -42,8 +42,11 @@ while toc(t0) < T
     canopyPos = [cx, cy, cz];
     bodyPos   = [cx, cy, max(cz - bodyDrop, 0)]; % CG below the canopy
 
-    % Orientations (deg): gentle bank into the turn; body roughly upright
-    canopyRPY = [15, 0, yaw];                    % roll, pitch, yaw
+    % Orientations (deg). Canopy kept LEVEL (roll=pitch=0) so the pipeline can be
+    % verified without a confusing constant bank — only the heading turns. (The real
+    % simulator will send whatever bank/pitch its physics computes.) Set roll back to
+    % ~15 if you want to see a banked turn.
+    canopyRPY = [0,  0, yaw];                     % roll, pitch, yaw
     bodyRPY   = [0,  0, yaw];
 
     % Velocities (rough analytic derivatives)
