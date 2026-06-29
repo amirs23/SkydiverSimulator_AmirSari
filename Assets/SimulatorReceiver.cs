@@ -14,27 +14,34 @@ using System.Threading;
 /// or the real lab simulator on the same port.
 ///
 /// ── WIRE PROTOCOL ────────────────────────────────────────────────────────────
-/// One UDP datagram per frame: an ASCII line of 29 comma-separated numbers, in
-/// this fixed order (matches Matlab/sim_to_unity.m):
+/// One UDP datagram per frame: an ASCII line of 26 comma-separated numbers, in
+/// the EXACT field order of the lab simulator's `x_s` struct (see
+/// simPhysicsOutput/Simulation Output.pdf and Matlab/sim_replay.m). `b` = canopy
+/// (parachute body), `s` = skydiver/store:
 ///
-///   0..2   canopy position    X,Y,Z
-///   3..5   skydiver position  X,Y,Z      (center of gravity)
-///   6..8   canopy orientation roll,pitch,yaw   (degrees)
-///   9..11  skydiver orientation roll,pitch,yaw (degrees)
-///   12..14 canopy linear velocity   Vx,Vy,Vz
-///   15..17 skydiver linear velocity Vx,Vy,Vz
-///   18..20 canopy angular velocity  wx,wy,wz   (deg/s)
-///   21..23 skydiver angular velocity wx,wy,wz  (deg/s)
-///   24..26 wind vector vx,vy,vz
-///   27     right steering input (0..1)
-///   28     left steering input  (0..1)
+///   0      t            time (s)            — unused by the renderer
+///   1..3   x_i_b y_i_b z_i_b        canopy position   (m)
+///   4..6   x_i_s y_i_s z_i_s        skydiver position (m)
+///   7..9   Vx_b Vy_b Vz_b           canopy velocity   (m/s)
+///   10..11 Vx_s Vy_s                skydiver velocity (m/s; sim has no Vz_s)
+///   12..14 p_b q_b r_b              canopy body rates (rad/s)
+///   15..17 p_s q_s r_s              skydiver body rates (rad/s)
+///   18..20 phi_b theta_b psi_b      canopy attitude   roll,pitch,yaw (deg)
+///   21..23 phi_s theta_s psi_s      skydiver attitude roll,pitch,yaw (deg)
+///   24     delta_l                  left toggle  (normalized; see toggleScale)
+///   25     delta_r                  right toggle (normalized; see toggleScale)
 ///
 /// ── COORDINATE FRAMES ────────────────────────────────────────────────────────
-/// FrameMode.EnuZupAerospace (default): the wire frame is right-handed, Z = up
-/// (altitude), X = east, Y = north, meters; yaw about +Z (heading, CCW from east),
-/// pitch about +Y, roll about +X. The receiver converts to Unity's left-handed
-/// Y-up frame. Use FrameMode.RawUnity if the sender already emits Unity coords
-/// (X=right, Y=up, Z=forward; orientation = Unity euler pitch/yaw/roll).
+/// FrameMode.EnuZupAerospace (default — name kept for back-compat): the simulator
+/// frame is a standard right-handed GNC / NED frame — X = forward(north),
+/// Y = right(east), Z = down — with 3-2-1 (yaw psi → pitch theta → roll phi) Euler
+/// angles in degrees. The receiver converts attitude to Unity's left-handed Y-up
+/// frame via a full axis-remapped LookRotation (NOT per-axis negation), which is
+/// what fixes the canopy-orientation bug. NOTE: in the example `x_s` data the
+/// position Z channel reads as ALTITUDE (up), counting down 1000→270 as it
+/// descends, while the velocity Vz is down-positive — `positionZIsAltitude`
+/// handles that mismatch. Use FrameMode.RawUnity if a sender already emits Unity
+/// coords (X=right, Y=up, Z=forward; orientation = Unity euler pitch/yaw/roll).
 public class SimulatorReceiver : MonoBehaviour
 {
     [Header("Network")]
@@ -50,10 +57,11 @@ public class SimulatorReceiver : MonoBehaviour
              "limbs locally on top — the two don't fight.")]
     public Rigidbody body;
 
-    [Tooltip("The scene's ProceduralCanopy. While the stream is live its avatar-follow is " +
-             "switched off so the simulator is the sole authority over canopy position " +
-             "(otherwise the follow yanks the canopy back over the avatar and the rig tears " +
-             "apart). Auto-found if left empty.")]
+    [Tooltip("The scene's ProceduralCanopy. The canopy POSITION always comes from its " +
+             "avatar-follow (canopy = avatar + offset), so the ~7 m suspension rig stays " +
+             "intact; the simulator drives only the canopy's ATTITUDE on top. (The sim " +
+             "separates canopy and skydiver by ~2 m, far less than the visual rig, so we " +
+             "never position the canopy absolutely from the sim.) Auto-found if left empty.")]
     public ProceduralCanopy proceduralCanopy;
 
     [Tooltip("Also rotate the skydiver body to the simulator's body heading. Leave OFF if the " +
@@ -74,6 +82,16 @@ public class SimulatorReceiver : MonoBehaviour
     [Tooltip("Flip the sign of the simulator's heading if turns go the wrong way.")]
     public bool invertHeading = false;
 
+    [Tooltip("The example sim stores position Z as ALTITUDE (up): it counts down " +
+             "1000→270 as the canopy descends. Leave ON so Unity height tracks it. " +
+             "Turn OFF only if the lab confirms position Z is the down coordinate.")]
+    public bool positionZIsAltitude = true;
+
+    [Tooltip("Multiplies the raw delta_l/delta_r toggle channel before it drives the " +
+             "arms. The sim normalizes the toggles (full pull here = 0.01), so 100 maps " +
+             "0.01 → 1.0 (full pull). Tune to taste — left as a controllable knob per the spec.")]
+    public float toggleScale = 100f;
+
     [Header("Stream gating")]
     [Tooltip("Until the first packet arrives, the canopy + body are frozen (kinematic, " +
              "zero velocity) so NOTHING moves or rotates without the simulator. Leave on.")]
@@ -90,7 +108,13 @@ public class SimulatorReceiver : MonoBehaviour
     public enum FrameMode { EnuZupAerospace, RawUnity }
 
     // Latest decoded packet, shared between the receive thread and the main thread.
-    const int N = 29;
+    const int N = 26;   // 26 fields of the simulator's x_s struct (see WIRE PROTOCOL)
+
+    // Field offsets into the packet (b = canopy, s = skydiver).
+    // (canopy position@1..3 is intentionally unused — see ApplyCanopy.)
+    const int S_POS = 4, B_VEL = 7, B_RATE = 12, B_ATT = 18, S_ATT = 21,
+              DELTA_L = 24, DELTA_R = 25;
+
     readonly float[] _latest = new float[N];
     readonly object  _lock = new object();
     bool _hasNew;
@@ -212,9 +236,9 @@ public class SimulatorReceiver : MonoBehaviour
         }
         _lastPacketTime = Time.time;
 
-        // Canopy: full pose from the simulator (pos@0 rot@6 linvel@12 angvel@18).
-        // Position + attitude both come from the stream; the avatar-follow is off
-        // (see SetFrozen) so nothing else competes for the canopy's position.
+        // Canopy: ATTITUDE + velocity from the simulator. Its POSITION is left to the
+        // avatar-follow (canopy = avatar + offset) so the suspension rig stays intact —
+        // see ApplyCanopy / SetFrozen.
         ApplyCanopy(f);
 
         // Skydiver: the simulator's CG channel (pos@3) carries the Avatar root through
@@ -222,19 +246,22 @@ public class SimulatorReceiver : MonoBehaviour
         // (and heading if asked) — never the limbs.
         ApplySkydiver(f);
 
-        Wind = ConvPos(f[24], f[25], f[26]);
+        // The simulator stream carries no wind channel — leave it zero so nothing
+        // reads a stale gust. (Wind visuals can be driven separately if needed.)
+        Wind = Vector3.zero;
 
-        // Right=27, Left=28 → steering toggles (ToggleArmAnimation turns these into
-        // shoulder pitch: 0 = arms up, 1 = arms down along the body).
-        PlayerMovement.SetToggles(f[28], f[27]);
+        // delta_l@24, delta_r@25 → steering toggles, scaled out of the sim's
+        // normalization (ToggleArmAnimation turns these into shoulder pitch:
+        // 0 = arms up, 1 = arms down along the body).
+        PlayerMovement.SetToggles(f[DELTA_L] * toggleScale, f[DELTA_R] * toggleScale);
     }
 
-    // Freeze (kinematic, zero velocity) or release the driven bodies, and toggle the
-    // canopy's avatar-follow. While frozen nothing — not gravity, joints, nor leftover
-    // velocity — can move them, and the canopy follows the avatar so the no-stream
-    // preview looks right. While live the bodies are non-kinematic (so the canopy's
-    // linearVelocity feeds the HUD) and the follow is OFF so the simulator alone
-    // positions the canopy.
+    // Freeze (kinematic, zero velocity) or release the driven bodies. While frozen
+    // nothing — not gravity, joints, nor leftover velocity — can move them. While live
+    // the canopy is non-kinematic so its linearVelocity feeds the HUD. The avatar-follow
+    // stays ON in BOTH states: the canopy is always positioned at avatar + offset, so the
+    // rig holds together whether or not the stream is running — the simulator only adds
+    // the canopy's attitude on top.
     void SetFrozen(bool frozen)
     {
         // The avatar body is always position-driven (never physics) — keep it kinematic
@@ -267,18 +294,23 @@ public class SimulatorReceiver : MonoBehaviour
             }
         }
 
-        // Restore the avatar-follow when frozen; switch it off when the stream drives.
+        // Keep the avatar-follow ON in both states so the canopy always rides above the
+        // avatar and the suspension rig stays intact (the sim drives only its attitude).
         if (proceduralCanopy != null)
-            proceduralCanopy.followTarget = frozen ? _followTarget : null;
+            proceduralCanopy.followTarget = _followTarget;
     }
 
     void ApplyCanopy(float[] f)
     {
         if (canopy == null) return;
-        canopy.position        = ConvPos(f[0],  f[1],  f[2]);
-        canopy.rotation        = ConvRot(f[6],  f[7],  f[8]);
-        canopy.linearVelocity  = ConvPos(f[12], f[13], f[14]);             // for HUD SPD/HDG
-        canopy.angularVelocity = ConvPos(f[18], f[19], f[20]) * Mathf.Deg2Rad;
+        // NOTE: canopy POSITION is intentionally NOT set here — ProceduralCanopy's
+        // avatar-follow keeps it at avatar + offset every LateUpdate so the rig holds
+        // together. We only drive attitude (banking turns) + velocity (HUD) on top.
+        canopy.rotation        = ConvRot(f[B_ATT],  f[B_ATT + 1],  f[B_ATT + 2]);  // roll,pitch,yaw
+        canopy.linearVelocity  = ConvVel(f[B_VEL],  f[B_VEL + 1],  f[B_VEL + 2]);   // for HUD SPD/HDG
+        // Body rates p,q,r (rad/s) about forward/right/down → Unity ang. vel about
+        // right(X)/up(Y)/forward(Z): (q, -r, p). Already radians — no Deg2Rad.
+        canopy.angularVelocity = new Vector3(f[B_RATE + 1], -f[B_RATE + 2], f[B_RATE]);
     }
 
     void ApplySkydiver(float[] f)
@@ -286,36 +318,69 @@ public class SimulatorReceiver : MonoBehaviour
         if (body == null) return;
         // Direct (teleport) placement — physics never touches the avatar; XSens poses
         // the limbs locally relative to this root.
-        body.position = ConvPos(f[3], f[4], f[5]);
+        body.position = ConvPos(f[S_POS], f[S_POS + 1], f[S_POS + 2]);
         if (driveBodyRotation)
-            body.rotation = ConvRot(f[9], f[10], f[11]);
+            body.rotation = ConvRot(f[S_ATT], f[S_ATT + 1], f[S_ATT + 2]);
     }
 
     // ── frame conversion ────────────────────────────────────────────────────────
 
-    Vector3 ConvPos(float x, float y, float z)
+    // A direction in the simulator's NED frame (north, east, down) → Unity
+    // (right = east, up = -down, forward = north). This single remap is what makes
+    // both positions and attitudes come out right despite the handedness flip.
+    static Vector3 NedDirToUnity(Vector3 ned) => new Vector3(ned.y, -ned.z, ned.x);
+
+    // Absolute position. In the example data the Z column is altitude (up), so we feed
+    // it in as down = -altitude; if the lab confirms Z is really the down coordinate,
+    // turn positionZIsAltitude off and it's passed straight through.
+    Vector3 ConvPos(float north, float east, float zCol)
     {
-        // ENU Z-up (east, north, up) → Unity (right=east, up, forward=north).
-        return frameMode == FrameMode.RawUnity
-            ? new Vector3(x, y, z)
-            : new Vector3(x, z, y);
+        if (frameMode == FrameMode.RawUnity) return new Vector3(north, east, zCol);
+        float down = positionZIsAltitude ? -zCol : zCol;
+        return NedDirToUnity(new Vector3(north, east, down));
     }
 
-    Quaternion ConvRot(float roll, float pitch, float yaw)
+    // Linear velocity. Vz is genuinely down-positive in the sim (positive while
+    // descending), so no altitude flip here — straight NED→Unity.
+    Vector3 ConvVel(float vNorth, float vEast, float vDown)
+    {
+        if (frameMode == FrameMode.RawUnity) return new Vector3(vNorth, vEast, vDown);
+        return NedDirToUnity(new Vector3(vNorth, vEast, vDown));
+    }
+
+    Quaternion ConvRot(float rollDeg, float pitchDeg, float yawDeg)
     {
         if (frameMode == FrameMode.RawUnity)
-            return Quaternion.Euler(pitch, yaw, roll);   // already Unity euler (X,Y,Z)
+            return Quaternion.Euler(pitchDeg, yawDeg, rollDeg);   // already Unity euler (X,Y,Z)
 
-        // Body-frame attitude → Unity. The canopy mesh is built Z=forward(chord),
-        // X=span(right), Y=up, so: roll (bank) = rotation about forward/Z, pitch about
-        // span/X, yaw (heading) about up/Y. The sim frame is right-handed and Unity is
-        // left-handed, so each angle is negated; heading also gets a calibration offset.
-        // (No fixed 90° offset — that wrongly assumed the canopy faced +X and was what
-        // spun the rig sideways.)
-        float uPitch = -pitch;
-        float uRoll  = -roll;
-        float uYaw   = headingOffsetDeg + (invertHeading ? yaw : -yaw);
-        return Quaternion.Euler(uPitch, uYaw, uRoll);
+        // NED 3-2-1 (yaw psi → pitch theta → roll phi) attitude → Unity. Instead of
+        // negating each Euler angle (which assumed the wrong frame and was the cause of
+        // the bad canopy orientation), build the body's forward and up axes in NED from
+        // the rotation matrix R = Rz(psi)·Ry(theta)·Rx(phi), remap each axis into Unity,
+        // and reconstruct the rotation with LookRotation. This is exact across the
+        // right-handed(NED) → left-handed(Unity) handedness change.
+        float yaw   = invertHeading ? -yawDeg : yawDeg;
+        float phi   = rollDeg  * Mathf.Deg2Rad;   // roll  about forward/X
+        float theta = pitchDeg * Mathf.Deg2Rad;   // pitch about right/Y
+        float psi   = yaw      * Mathf.Deg2Rad;   // yaw   about down/Z
+
+        float cphi = Mathf.Cos(phi),   sphi = Mathf.Sin(phi);
+        float cth  = Mathf.Cos(theta), sth  = Mathf.Sin(theta);
+        float cpsi = Mathf.Cos(psi),   spsi = Mathf.Sin(psi);
+
+        // Columns of R (body axes expressed in NED).
+        Vector3 fwdNed  = new Vector3(cth * cpsi, cth * spsi, -sth);                 // body +X (forward)
+        Vector3 downNed = new Vector3(cphi * sth * cpsi + sphi * spsi,               // body +Z (down)
+                                      cphi * sth * spsi - sphi * cpsi,
+                                      cphi * cth);
+
+        Vector3 fwdU = NedDirToUnity(fwdNed);
+        Vector3 upU  = NedDirToUnity(-downNed);
+        Quaternion q = Quaternion.LookRotation(fwdU, upU);
+
+        // Optional manual heading trim (applied in Unity's world-up).
+        if (headingOffsetDeg != 0f) q = Quaternion.Euler(0f, headingOffsetDeg, 0f) * q;
+        return q;
     }
 
     // ── shutdown ────────────────────────────────────────────────────────────────

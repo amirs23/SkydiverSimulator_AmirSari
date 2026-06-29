@@ -61,7 +61,54 @@ git pull
 
 ---
 
+## UPDATE 2026-06-29 (Sari) — match the REAL simulator format + NED rotation
+
+We got the lab's actual simulator output spec (`simPhysicsOutput/Simulation Output.pdf`
++ example `sim_out.mat`). Reworked the wire format and frame math to match it. This
+supersedes the 29-field placeholder layout and the per-axis-negation rotation below.
+
+**New wire format (26 fields = the sim's `x_s` struct, in struct order):**
+`t, x_i_b,y_i_b,z_i_b, x_i_s,y_i_s,z_i_s, Vx_b,Vy_b,Vz_b, Vx_s,Vy_s,
+p_b,q_b,r_b, p_s,q_s,r_s, phi_b,theta_b,psi_b, phi_s,theta_s,psi_s, delta_l,delta_r`
+(b = canopy/parachute, s = skydiver/store. Note the sim has **no Vz_s** and **no wind**.)
+
+**Frame:** simulator is standard GNC/**NED** — X fwd, Y right, **Z down** — Euler order
+**3-2-1 (yaw→pitch→roll), degrees**; rates rad/s. `SimulatorReceiver.ConvRot` now builds
+the body fwd/up axes from R = Rz(ψ)·Ry(θ)·Rx(φ), remaps each axis NED→Unity
+`(north,east,down)→(east,-down,north)`, and rebuilds via `LookRotation` — exact across the
+right→left handedness flip. This **replaces the old `Euler(-pitch,-yaw,-roll)` hack** that
+was the canopy-orientation bug. Verified numerically against the example: canopy descends,
+flies forward, nose points along the velocity, stays level. ✅
+
+**Toggles:** `delta_l/delta_r` are normalized (full pull here = 0.01). New `toggleScale`
+knob (default 100) maps 0.01 → 1.0; left tunable per the spec.
+
+**Test harness:** `Matlab/sim_replay.m` streams the example `sim_out.mat` (20001 samples,
+100 Hz) over UDP 9764. Press Play in Unity FIRST, then run it. (Old `sim_to_unity.m`
+synthetic spiral still exists but uses the OLD format — don't mix.)
+
+**Rig assembly (decided 2026-06-29 — fixes the inverted-rig screenshot):** the AVATAR is the
+world-positioned body (driven absolutely from the sim's skydiver channel `z_i_s`); the CANOPY
+is **never positioned absolutely** from the sim — ProceduralCanopy's avatar-follow keeps it at
+`avatar + offset` so the ~7 m suspension rig always holds together, and the sim drives only the
+canopy's **attitude** (banking) on top. `followTarget` now stays ON in both frozen and live
+states (previously it was nulled while live, which — combined with `z_i_s = z_i_b + 2` — put the
+avatar *above* the canopy and inverted the whole rig). This also permanently removes the 06-22
+"rig tears apart" position fight (only one canopy-position authority now).
+
+**⚠️ Still to confirm with the lab:**
+- **Position Z sign.** The example data is internally inconsistent: position `z` reads as
+  ALTITUDE (1000→270 as it descends) while velocity `Vz` is down-positive, and `z_i_s = z_i_b + 2`
+  (down-like). `positionZIsAltitude` (default ON) makes the avatar descend correctly, which is
+  what we want; the follow-based rig above means the b/s offset no longer matters visually. Still
+  worth confirming the true convention so the absolute descent direction is guaranteed right.
+
+---
+
 ## Matlab / simulator integration (SimulatorReceiver.cs, reworked 2026-06-22)
+
+> ⚠️ The 29-field layout and ENU/Z-up notes in THIS section are **superseded** by the
+> 2026-06-29 update above. Kept for history.
 
 The lab simulator → Matlab → Unity UDP pipeline. `SimulatorReceiver.cs` is on the
 **PhysicsController** object (listens UDP 9764; XSens stays on 9763). Test sender:
