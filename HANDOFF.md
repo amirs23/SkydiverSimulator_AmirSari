@@ -12,7 +12,6 @@
 | Repo | https://github.com/amirs23/SkydiverSimulator_AmirSari (private — Amir's GitHub) |
 | Unity version | 6000.2.6f2 |
 | Target device | Meta Quest 2 (standalone Android APK, sideloaded) |
-| Companion project | AR Freefall (XREAL) — see `SariMorkos/SkydiverAR` |
 
 **Always start a session with:**
 ```bash

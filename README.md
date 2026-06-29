@@ -6,19 +6,10 @@
 
 ## What This Project Is
 
-We are building **two Unity simulation projects** for a skydiving simulator:
-
-### Project 1 — AR Freefall → [SariMorkos/SkydiverAR](https://github.com/SariMorkos/SkydiverAR.git)
-- Skydiver in **free fall** (before parachute opens)
-- Uses **XREAL Air2 Ultra** AR goggles
-- Separate Unity project — see repo above
-- Will use XSens motion capture to animate the skydiver body
-
-### Project 2 — VR Parachute Simulator (THIS REPO — IN PROGRESS)
-- Skydiver **under a parachute**, flying through the sky
+**VR Parachute Simulator** — a Unity simulation of a skydiver **under a parachute**, flying through the sky:
 - Uses **Oculus Meta Quest 2** VR headset
 - Built on top of a previous student's project (Gilad)
-- Real aerodynamics via a Matlab/C++ physics engine (EOM_Solver)
+- Real aerodynamics via a Matlab/C++ physics engine (EOM_Solver) / the lab simulator stream
 
 ---
 
@@ -212,7 +203,7 @@ SkydiverSimulator_AmirSari/
 
 ## Roadmap / upcoming (as of 2026-06-17)
 
-See `TASKS.md` for details. Next planned work on Project 2:
+See `TASKS.md` for details. Next planned work:
 
 1. **First/third-person camera switcher** — runtime toggle between `VRCameraRig.cs` (first-person, head-tracked) and `CameraFollow.cs` (third-person chase).
 2. **Richer environment** — add real 3D ground props (buildings, trees, landmarks) on top of `GrassGround.cs` + `SkyGrid.cs`, mindful of Quest 2 performance.

@@ -47,23 +47,12 @@
 |------|-------------|-------|
 | Test camera switcher on Quest 2 | Sari | `CameraViewController.cs` is wired and works in the Editor. Put on the Quest 2 and verify: B button toggles views, first person sits at the eyes (tune `firstPersonOffset`), third person frames the whole canopy + pilot chute (tune `thirdPersonOffset`). HMD drives rotation in VR, so `firstPersonEuler` (Editor-only) is irrelevant on device. |
 
-## To Do — Project 2 (VR Parachute)
+## To Do — VR Parachute
 
 | Task | Assigned to | Priority | Notes |
 |------|-------------|----------|-------|
 | Richer environment (buildings, trees, props) | TBD | MED | Today the world is only `GrassGround.cs` (green plane) + `SkyGrid.cs` (clouds). Add real 3D ground props — buildings, trees, landmarks — so there's a believable scene to descend toward. Watch Quest 2 performance: low-poly assets, GPU instancing / LOD, and keep props near the landing zone. |
 | Assign SkyboxGrass material in Unity | Sari | LOW | Window → Rendering → Lighting → Skybox Material → drag in Assets/Materials/SkyboxGrass.mat. Fixes horizon color mismatch. |
-
----
-
-## To Do — Project 1 (AR Freefall)
-
-| Task | Assigned to | Priority | Notes |
-|------|-------------|----------|-------|
-| Create new Unity project | TBD | HIGH | Separate project from this one |
-| Install XREAL SDK | TBD | HIGH | For XREAL Air2 Ultra goggles |
-| Set up freefall scene | TBD | HIGH | Avatar falling through sky |
-| Connect XSens to new project | TBD | HIGH | Same pipeline as Project 2 |
 
 ---
 
@@ -98,8 +87,7 @@ git push
 ## Note for Sari's AI — next session
 
 - Pull latest, open Integration_Ready.unity
-- The scene is fully working on Mac (no VR). All Project 2 scripts are live.
+- The scene is fully working on Mac (no VR). All scripts are live.
 - VelocityArrows needs canopy Rigidbody wired once physics runs on Windows
 - SkydiverHUD needs canopy Rigidbody wired in Inspector (drag Canopy_Rotated's Rigidbody into the slot)
 - XR/Oculus packages were removed due to Unity 6 incompatibility — re-add compatible version on Windows build machine before Quest 2 build
-- Project 1 (AR Freefall) not started — see To Do section above
