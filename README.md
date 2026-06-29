@@ -206,7 +206,7 @@ SkydiverSimulator_AmirSari/
 See `TASKS.md` for details. Next planned work:
 
 1. **First/third-person camera switcher** — runtime toggle between `VRCameraRig.cs` (first-person, head-tracked) and `CameraFollow.cs` (third-person chase).
-2. **Richer environment** — add real 3D ground props (buildings, trees, landmarks) on top of `GrassGround.cs` + `SkyGrid.cs`, mindful of Quest 2 performance.
+2. **Richer environment** (owner: Amir) — add real 3D ground props (buildings, trees, landmarks) on top of `GrassGround.cs` + `SkyGrid.cs`. Must be **visible from any height** (no pop-in/culling from the spawn altitude down to the ground) and **spread out to the visible horizon**, while staying mindful of Quest 2 performance.
 3. **Skydiver/canopy movement via the Matlab physics** — drive the avatar+canopy translation through the world from the Matlab pipeline (`animate_to_unity.m` UDP + `EOM_Solver.dll` on the lab PC) instead of the pure-C# placeholder.
 
 ---
@@ -318,7 +318,7 @@ The internal physics (`PlayerMovement.cs` + `EOM_Solver.dll`) will be replaced b
 | Multi-cell ram-air canopy mesh (each cell a different color, 7 or 9 cells) | HIGH |
 | Full suspension line system rewrite — slider, risers, steering lines, toggles | HIGH |
 | Pilot chute (small dome trailing behind canopy, oriented to velocity) | MEDIUM |
-| Ground environment — trees and buildings visible from altitude | MEDIUM |
+| Ground environment — trees and buildings, **visible from any height** and **spread out to the horizon** (no pop-in / culling, fills the whole visible ground) — owner: Amir, see HANDOFF | MEDIUM |
 | First/third person camera toggle — keyboard, Quest button, and Matlab UDP signal | MEDIUM |
 | Remove DevColorize from Avatar GameObject | LOW |
 | Horizon color mismatch fine-tuning | LOW |

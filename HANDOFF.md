@@ -178,7 +178,20 @@ New `Assets/GroundEnvironment.cs` — attach to an empty `Environment` object at
 
 Design choices (per Sari): NOT a runtime chunk streamer — everything is placed up front so it's all visible from 500m with no pop-in. Keeps a clear landing circle around origin; props reuse a few shared URP/Lit materials + primitive meshes, colliders stripped, flagged Static for batching. Auto-raises `Camera.main` far-clip to 3000 + adds linear fog at launch so distant ground renders from altitude. Counts (~280 buildings / ~1400 trees), `areaHalfExtent`, `townHalfExtent`, `seed` all tunable.
 
-**STILL TODO:** generate + save in the scene, then tune density/area and **test framerate on Quest 2** (lower counts if it dips). Confirm the VR rig camera is tagged `MainCamera` (or the far-clip bump won't apply).
+**STILL TODO (owner: Amir).** Two hard requirements from Sari that the final result must meet:
+1. **Visible from ANY height** — from the spawn altitude all the way to the ground, the
+   environment must never pop in or get culled. Push the camera far-clip high enough to cover
+   the full spawn height, and make sure distance fog isn't hiding the ground (the current
+   linear fog may need to be pushed out or dropped). No runtime chunk streaming — keep
+   everything placed up front.
+2. **Spreads as far as the eye can see** — fill the entire visible ground out to the horizon,
+   not just a patch around the landing zone. Increase `areaHalfExtent` / coverage so the props
+   reach the visible horizon at the spawn altitude.
+
+Then generate + save in the scene, tune density/area, and **test framerate on Quest 2** (lower
+counts / add LOD / GPU instancing if it dips). Confirm the VR rig camera is tagged `MainCamera`
+(or the far-clip bump won't apply). The current `GroundEnvironment.cs` (~280 buildings / ~1400
+trees, far-clip 3000) is the starting point — extend it to satisfy (1) + (2).
 
 ---
 

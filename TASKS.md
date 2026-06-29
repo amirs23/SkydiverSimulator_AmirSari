@@ -51,7 +51,7 @@
 
 | Task | Assigned to | Priority | Notes |
 |------|-------------|----------|-------|
-| Richer environment (buildings, trees, props) | TBD | MED | Today the world is only `GrassGround.cs` (green plane) + `SkyGrid.cs` (clouds). Add real 3D ground props — buildings, trees, landmarks — so there's a believable scene to descend toward. Watch Quest 2 performance: low-poly assets, GPU instancing / LOD, and keep props near the landing zone. |
+| Richer environment (buildings, trees, props) | **Amir** | MED | Today the world is only `GrassGround.cs` (green plane) + `SkyGrid.cs` (clouds). Add real 3D ground props — buildings, trees, landmarks — so there's a believable scene to descend toward. **REQUIREMENTS (from Sari):** (1) the environment must be **visible from ANY height** — from the spawn altitude all the way down to the ground, nothing should pop in or be culled (raise the camera far-clip enough, no distance fog hiding it, no runtime chunk streaming). (2) it must **spread as far as the eye can see** — fill the whole visible ground out to the horizon, not just a patch around the landing zone. Starting point exists: `GroundEnvironment.cs` baker (right-click → "Generate Environment") already scatters a town + tree fields up front and bumps far-clip — Amir to extend coverage/density to meet (1)+(2) and **tune for Quest 2 framerate** (low-poly, GPU instancing / LOD; lower counts if it dips). |
 | Assign SkyboxGrass material in Unity | Sari | LOW | Window → Rendering → Lighting → Skybox Material → drag in Assets/Materials/SkyboxGrass.mat. Fixes horizon color mismatch. |
 
 ---
