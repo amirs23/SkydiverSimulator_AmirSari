@@ -1,5 +1,5 @@
 # TASKS — SkydiverSimulator
-**Last updated: 2026-06-14 (Amir)**
+**Last updated: 2026-06-15 (Amir) + 2026-06-29 (Sari)**
 **Amir's AI**: Claude (claude-sonnet-4-6)
 **Sari's AI**: Claude (claude-sonnet-4-6)
 
@@ -24,37 +24,44 @@
 | VR packages added to manifest.json | Sari (2026-05-19) | com.unity.xr.management 4.4.0 + com.unity.xr.oculus 4.2.0 |
 | VRCameraRig.cs script | Sari (2026-05-19) | Disables CameraFollow on Quest 2, sets Floor tracking origin |
 | Android app ID updated | Sari (2026-05-19) | com.Technion.SkydiverVR |
-| VR setup fully configured in Unity Editor | Sari (2026-05-19) | XR Plug-in Management → Android → Oculus checked, Quest 2 target set, VRCameraRig added to Main Camera, scene saved |
-| HUD / UI overlay | Sari (2026-05-19) | SkydiverHUD.cs — shows ALT, SPD, HDG. Auto-creates world-space canvas on Main Camera. Needs canopy Rigidbody wired in Inspector. |
-| Physics simulation (EOM_Solver) hookup | Amir (2026-05-19) | PlayerMovement.cs fixed: rotation bug (quaternion→eulerAngles), camera override removed, cross-platform guard added (#if WIN). Works on all platforms; on Mac/Quest state passes through unchanged. |
-| Velocity/heading arrows | Amir (2026-05-19) | VelocityArrows.cs — cyan arrow = horizontal speed/direction, yellow arrow = vertical (descent). Attach to scene, drag canopy Rigidbody in Inspector. |
-| Wind/environment effects | Amir (2026-05-19) | WindEffect.cs — 60 cloud-sphere particles drift upward past the avatar giving sense of descent. Attach to scene, drag Avatar in Inspector. |
-| Landing zone marker | Amir (2026-05-19) | LandingZoneMarker.cs — pulsing orange bullseye (2 rings + crosshair) drawn with LineRenderers. Place GameObject on the ground at the target spot. |
-| Scene wired up and verified on Mac | Amir (2026-05-20) | WindEffect (Avatar wired), LandingZoneMarker (at X:20 Z:20), VelocityArrows (canopy Rigidbody slot empty — activates when EOM_Solver runs on Windows) added to Integration_Ready.unity. XR packages conflict fixed (removed com.unity.xr.oculus — Sari must re-add on Windows build machine). Apply Root Motion unchecked on Avatar Animator. Scene verified: avatar animates, suspension lines connected, HUD working, wind particles visible, landing zone pulsing. |
-| Destination arrow (nav indicator) | Sari (2026-05-31) | DestinationArrow.cs — arrow floats in front of avatar, points toward a draggable destination target. All fields Inspector-configurable. |
-| Grass ground | Sari (2026-05-31) | GrassGround.cs — attach to Plane. Auto-scales plane to 2000x, applies green URP/Lit material. |
-| Cloud layer (SkyGrid rewrite) | Sari (2026-05-31) | SkyGrid.cs rewritten — fluffy puff-sphere cloud clusters, fixed Y altitude, follows avatar in XZ. Avatar start height raised to 500m. |
-| Procedural ram-air canopy | Amir (2026-06-14) | ProceduralCanopy.cs — 9 cells each a different colour, full suspension line system (A/B/C/D per rib), slider, 4 risers, steering lines, pilot chute. All generated at runtime, no external mesh needed. Replaces Canopy_Rotated + SuspensionLines.cs. See README for full setup. |
-| Toggle arm animation | Amir (2026-06-14) | ToggleArmAnimation.cs — arms animate between raised (holding toggles) and pulled (steering) based on left/right toggle inputs. Works with Quest triggers and A/D/Space keyboard. Disable when using XSens suit — XSens drives arms directly. |
-| Expose LeftToggle / RightToggle | Amir (2026-06-14) | PlayerMovement.cs — added LeftToggle and RightToggle static properties so ToggleArmAnimation and other scripts can read per-hand values. |
+| VR setup fully configured in Unity Editor | Sari (2026-05-19) | XR Plug-in Management → Android → Oculus checked, Quest 2 target set |
+| HUD / UI overlay | Sari (2026-05-19) | SkydiverHUD.cs — shows ALT, SPD, HDG, BRK |
+| Physics simulation (EOM_Solver) hookup | Amir (2026-05-19) | PlayerMovement.cs fixed: rotation bug, camera override removed, cross-platform guard |
+| Velocity/heading arrows | Amir (2026-05-19) | VelocityArrows.cs |
+| Wind/environment effects | Amir (2026-05-19) | WindEffect.cs |
+| Landing zone marker | Amir (2026-05-19) | LandingZoneMarker.cs |
+| Scene wired up and verified on Mac | Amir (2026-05-20) | Integration_Ready.unity scene: avatar animates, HUD working, wind particles visible |
+| Destination arrow (nav indicator) | Sari (2026-05-31) | DestinationArrow.cs |
+| Grass ground | Sari (2026-05-31) | GrassGround.cs — 2000m green plane + skybox horizon blend |
+| Cloud layer (SkyGrid rewrite) | Sari (2026-05-31) | SkyGrid.cs rewritten — fluffy puff-sphere cloud clusters |
+| Procedural ram-air canopy | Amir (2026-06-14) | ProceduralCanopy.cs — 9 cells each a different colour, full suspension line system (A/B/C/D per rib), slider, 4 risers, steering lines, pilot chute. Replaces Canopy_Rotated + SuspensionLines.cs. |
+| Toggle arm animation | Amir (2026-06-14) | ToggleArmAnimation.cs — arms animate between raised (toggles) and pulled (steering) based on left/right toggle inputs. Disable when using XSens — XSens drives arms directly. |
+| Expose LeftToggle / RightToggle | Amir (2026-06-14) | PlayerMovement.cs — added LeftToggle and RightToggle static properties + SetToggles() static method |
+| Steering lines → real skinned hand bones | Sari (2026-06-16) | ProceduralCanopy now resolves to Hips-rooted `" 1"` bones (LeftCarpus 1/RightCarpus 1). Fixed the "cables pinned to torso" bug. See README FIXED section. |
+| Toggle grip handles + line thickness | Sari (2026-06-16) | `showToggleHandles` grips in each hand at bottom of steering lines. `lineWidth` 0.006→0.035. |
+| First/third-person camera switcher (code) | Sari (2026-06-17) | CameraViewController.cs on Main Camera. V key (Editor) / Quest B button. NOT yet tested on Quest. |
+| Richer environment baker (code) | Sari (2026-06-17) | GroundEnvironment.cs — right-click "Generate Environment" → town + trees up to 2500m half-extent. NOT yet tuned/tested on Quest. |
+| GroundEnvironment extended + fog fixed | Amir (2026-06-15) | Raised areaHalfExtent to 3000m, cameraFarClip to 5000m, fog pushed past map edge so environment is visible from any height. Town + tree counts increased for horizon fill. |
+| Matlab-driven movement — UDP receiver (matched to REAL sim format) | Sari (2026-06-29) | SimulatorReceiver.cs (port 9764). Reads the lab's actual 26-field `x_s` packet (NED, 3-2-1 Euler deg). Tested against sim_out.mat via sim_replay.m. See HANDOFF. |
 
 ---
 
 ## In Progress
 
-*(none)*
+| Task | Assigned to | Notes |
+|------|-------------|-------|
+| Test camera switcher on Quest 2 | Sari | CameraViewController.cs works in Editor. Verify B button toggles, first-person eye position, third-person framing. |
 
 ---
 
-## To Do — Project 2 (VR Parachute)
+## To Do — VR Parachute
 
 | Task | Assigned to | Priority | Notes |
 |------|-------------|----------|-------|
-| Wire ProceduralCanopy in Unity Editor | Sari | HIGH | See "ProceduralCanopy scene setup" section in README. Disable old Canopy_Rotated + SuspensionLines.cs. |
-| New UDP receiver for lab simulator data | TBD | HIGH | Replace PlayerMovement.cs + EOM_Solver.dll. Unity reads canopy/body position+velocity from lab Matlab script via UDP. Unity becomes pure renderer. |
-| Arm animation driven by steering inputs from UDP | TBD | HIGH | When lab simulator sends left/right toggle values over UDP, feed them into ToggleArmAnimation instead of reading Quest triggers. |
-| First/third person camera toggle | TBD | MEDIUM | Keyboard + Quest button + Matlab UDP signal. |
-| Ground environment — trees/buildings | TBD | MEDIUM | Visible from altitude. |
+| Confirm position-Z sign convention with lab | TBD | HIGH | See HANDOFF — `positionZIsAltitude` flag currently ON; example data is internally inconsistent. Confirm with the lab team. |
+| Arm ownership — XSens vs SimulatorReceiver | TBD | HIGH | XSens drives arm bones AND SimulatorReceiver feeds toggle values to ToggleArmAnimation. Both write the same bones → conflict. Decide: if XSens suit is active, disable ToggleArmAnimation; if no suit, enable it. |
+| Verify SimulatorReceiver on lab Windows PC | TBD | HIGH | Confirm real EOM_Solver output matches the 26-field format. Test live with the lab stream. |
+| Tune GroundEnvironment on Quest 2 | Amir | MED | Run on device, profile framerate. Lower tree/building counts if it dips below 72fps. Check GPU instancing is active on Quest. |
 | Assign SkyboxGrass material in Unity | Sari | LOW | Window → Rendering → Lighting → Skybox Material → drag Assets/Materials/SkyboxGrass.mat |
 | Remove DevColorize from Avatar GameObject | TBD | LOW | |
 
@@ -90,17 +97,15 @@ git push
 |-------|-------------|--------|
 | EOM_Solver.dll is Windows-only, can't test physics on Mac | Amir | Open — test at lab |
 | com.unity.xr.oculus removed from manifest — incompatible with Unity 6 on Mac | Amir (2026-05-20) | Sari: re-add on Windows build machine (try com.unity.xr.oculus 4.3.0+) or switch to Meta XR SDK |
-| ProceduralCanopy Follow Target must be Hips bone, NOT Avatar root | Amir (2026-06-14) | The Avatar root doesn't move — XSens drives bones. Set Follow Target = Hips bone so canopy tracks avatar correctly. |
+| ProceduralCanopy Follow Target must be Hips bone, NOT Avatar root | Amir (2026-06-14) | The Avatar root doesn't move — XSens drives bones. Set Follow Target = Hips bone. RESOLVED in SimulatorReceiver path by following the avatar transform. |
+| Avatar has duplicate bones — skinned `" 1"` copies vs flat `j*` copies | Sari (2026-06-16) | All bone references MUST use the Hips-rooted `" 1"` copies. ProceduralCanopy.FindSkinnedBone() handles this automatically. ToggleArmAnimation Inspector slots may need re-checking. |
 
 ---
 
-## Note for Sari's AI — next session
+## Note for next AI session
 
-- Pull latest, open `Integration_Ready.unity`
-- **Most important task**: wire up ProceduralCanopy in the Editor (see README "ProceduralCanopy scene setup" section)
-  - Create empty GameObject → Add Component → ProceduralCanopy
-  - Follow Target = **Hips bone** (not Avatar root)
-  - Left/Right Shoulder + Hand bones → wire correct bones
-  - Disable old `Canopy_Rotated` GameObject and `SuspensionLines` component
-- ToggleArmAnimation.cs is for keyboard/Quest testing — **disable it when using XSens Matlab pipeline**
-- XSens arm movement works automatically: Movella drives all bones including arms → ProceduralCanopy steering lines follow hand bones live
+- Run `git pull`, open `Integration_Ready.unity`
+- Read HANDOFF.md — it has the detailed state of SimulatorReceiver and the NED frame math
+- **Most urgent** (from HANDOFF): confirm position-Z sign convention with lab + arm ownership decision
+- GroundEnvironment is coded but not yet tested on Quest — if this session is on the lab machine, test framerate and tune counts if needed
+- ToggleArmAnimation.cs — check if Inspector slots point to the `" 1"` (skinned) bones or the flat `j*` nodes (non-moving); re-wire if needed

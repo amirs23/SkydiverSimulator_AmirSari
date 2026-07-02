@@ -1,5 +1,5 @@
 # HANDOFF — SkydiverSimulator (VR Parachute, Quest 2)
-**Last updated: 2026-05-31 (Sari)**
+**Last updated: 2026-06-22 (Sari)**
 
 ---
 
@@ -12,7 +12,6 @@
 | Repo | https://github.com/amirs23/SkydiverSimulator_AmirSari (private — Amir's GitHub) |
 | Unity version | 6000.2.6f2 |
 | Target device | Meta Quest 2 (standalone Android APK, sideloaded) |
-| Companion project | AR Freefall (XREAL) — see `SariMorkos/SkydiverAR` |
 
 **Always start a session with:**
 ```bash
@@ -50,6 +49,186 @@ git pull
 | Restart mid-flight or after landing | ✓ added 2026-05-26 — A button (Quest) / R key (Editor) |
 | Wind particles follow direction of travel | ✓ fixed 2026-05-26 — combined up + backward drift in WindEffect |
 | Destination arrow (nav indicator) | ✓ added 2026-05-31 — DestinationArrow.cs, floats in front of avatar, points at draggable target |
+| Procedural ram-air canopy | ✓ added 2026-06-14 — ProceduralCanopy.cs builds the whole canopy at runtime (cells, slider, pilot chute, suspension lines), with a right-click "Bake Canopy" workflow that saves the static parts into the scene |
+| Steering lines attach to the hands | ✓ fixed 2026-06-16 — cables now target the real skinned hand bones (`LeftCarpus 1`/`RightCarpus 1`). See "Avatar has duplicate bones" note below |
+| Steering toggle grips | ✓ added 2026-06-16 — a small grip in each hand at the bottom of the steering lines (`showToggleHandles` on ProceduralCanopy) |
+| Suspension/steering line thickness | ✓ fixed 2026-06-16 — `lineWidth` 0.006 → 0.035 so thin lines stop rendering dashed at distance |
+| First/third-person camera switcher | ◐ code done 2026-06-17, **not yet tested on Quest** — `CameraViewController.cs` (see below) |
+| Richer environment (town + trees) | ◐ baker done 2026-06-17, **not yet tuned/tested on Quest** — `GroundEnvironment.cs` (see below) |
+| Tunable spawn altitude | ✓ added 2026-06-17 — `startHeight` field on `PlayerMovement` (was hardcoded 500m); lower it to test near the ground |
+| Matlab-driven movement (UDP) | ◐ reworked 2026-06-22 — freeze-until-stream + Sim=world/XSens=pose authority done; **canopy orientation + slider still look wrong** (see "Matlab/simulator integration" below) |
+
+---
+
+## UPDATE 2026-06-29 (Sari) — match the REAL simulator format + NED rotation
+
+We got the lab's actual simulator output spec (`simPhysicsOutput/Simulation Output.pdf`
++ example `sim_out.mat`). Reworked the wire format and frame math to match it. This
+supersedes the 29-field placeholder layout and the per-axis-negation rotation below.
+
+**New wire format (26 fields = the sim's `x_s` struct, in struct order):**
+`t, x_i_b,y_i_b,z_i_b, x_i_s,y_i_s,z_i_s, Vx_b,Vy_b,Vz_b, Vx_s,Vy_s,
+p_b,q_b,r_b, p_s,q_s,r_s, phi_b,theta_b,psi_b, phi_s,theta_s,psi_s, delta_l,delta_r`
+(b = canopy/parachute, s = skydiver/store. Note the sim has **no Vz_s** and **no wind**.)
+
+**Frame:** simulator is standard GNC/**NED** — X fwd, Y right, **Z down** — Euler order
+**3-2-1 (yaw→pitch→roll), degrees**; rates rad/s. `SimulatorReceiver.ConvRot` now builds
+the body fwd/up axes from R = Rz(ψ)·Ry(θ)·Rx(φ), remaps each axis NED→Unity
+`(north,east,down)→(east,-down,north)`, and rebuilds via `LookRotation` — exact across the
+right→left handedness flip. This **replaces the old `Euler(-pitch,-yaw,-roll)` hack** that
+was the canopy-orientation bug. Verified numerically against the example: canopy descends,
+flies forward, nose points along the velocity, stays level. ✅
+
+**Toggles:** `delta_l/delta_r` are normalized (full pull here = 0.01). New `toggleScale`
+knob (default 100) maps 0.01 → 1.0; left tunable per the spec.
+
+**Test harness:** `Matlab/sim_replay.m` streams the example `sim_out.mat` (20001 samples,
+100 Hz) over UDP 9764. Press Play in Unity FIRST, then run it. (Old `sim_to_unity.m`
+synthetic spiral still exists but uses the OLD format — don't mix.)
+
+**Rig assembly (decided 2026-06-29 — fixes the inverted-rig screenshot):** the AVATAR is the
+world-positioned body (driven absolutely from the sim's skydiver channel `z_i_s`); the CANOPY
+is **never positioned absolutely** from the sim — ProceduralCanopy's avatar-follow keeps it at
+`avatar + offset` so the ~7 m suspension rig always holds together, and the sim drives only the
+canopy's **attitude** (banking) on top. `followTarget` now stays ON in both frozen and live
+states (previously it was nulled while live, which — combined with `z_i_s = z_i_b + 2` — put the
+avatar *above* the canopy and inverted the whole rig). This also permanently removes the 06-22
+"rig tears apart" position fight (only one canopy-position authority now).
+
+**⚠️ Still to confirm with the lab:**
+- **Position Z sign.** The example data is internally inconsistent: position `z` reads as
+  ALTITUDE (1000→270 as it descends) while velocity `Vz` is down-positive, and `z_i_s = z_i_b + 2`
+  (down-like). `positionZIsAltitude` (default ON) makes the avatar descend correctly, which is
+  what we want; the follow-based rig above means the b/s offset no longer matters visually. Still
+  worth confirming the true convention so the absolute descent direction is guaranteed right.
+
+---
+
+## Matlab / simulator integration (SimulatorReceiver.cs, reworked 2026-06-22)
+
+> ⚠️ The 29-field layout and ENU/Z-up notes in THIS section are **superseded** by the
+> 2026-06-29 update above. Kept for history.
+
+The lab simulator → Matlab → Unity UDP pipeline. `SimulatorReceiver.cs` is on the
+**PhysicsController** object (listens UDP 9764; XSens stays on 9763). Test sender:
+`Matlab/sim_to_unity.m` (spiral descent). **Run Unity Play FIRST, then the .m script.**
+
+### Confirmed design decisions (from Sari, 2026-06-22)
+- **Authority: Sim = world, XSens = pose.** The simulator's CG channel moves the whole
+  skydiver (Avatar root) through the world; XSens only articulates the limbs locally.
+  Verified safe: `Packages/com.movella.xsens/.../XsensDevice.cs` writes only bone-LOCAL
+  transforms (with `applyRootMotion` off it never touches the Avatar root's world pos),
+  so moving the root and XSens posing don't fight.
+- **Real simulator output frame (confirmed by Sari):** position is **Z-up (altitude),
+  degrees, roll/pitch/yaw**. So `Frame Mode = EnuZupAerospace` is correct (NOT RawUnity).
+
+### What was fixed this session
+1. **Nothing moves without packets.** Before the first packet the canopy + body are
+   hard-frozen (kinematic, zero velocity) and `PlayerMovement` is auto-found + disabled
+   (its glide model was spinning the rig). Re-freezes if the stream stops >
+   `streamTimeout` (0.5s). New knobs: `freezeUntilStream`, `streamTimeout`.
+2. **Rig no longer tears apart.** Root cause: the canopy was position-driven by BOTH the
+   sim AND `ProceduralCanopy`'s avatar-follow (`followTarget + 7m`, every LateUpdate).
+   Fix: while the stream is live, SimulatorReceiver sets `proceduralCanopy.followTarget =
+   null` so the sim is the sole canopy-position authority; restores it when frozen so the
+   no-stream preview still looks right. New slot: `proceduralCanopy` (auto-finds).
+3. **Removed a bogus 90° heading offset** in the rotation conversion (it assumed the
+   canopy faced Unity +X; the mesh faces +Z). Added live calibration: `headingOffsetDeg`,
+   `invertHeading`, `driveBodyRotation` (default OFF — body facing comes from XSens).
+
+### EXACT data handling (audit trail — nothing else happens)
+- Position (canopy `f[0,1,2]`, avatar `f[3,4,5]`): packet `(X,Y,Z)` → Unity `(X, Z, Y)`
+  (altitude Z → Unity up). No scale, no offset — object placed at received coords.
+- Velocity: same axis swap (HUD only).
+- Rotation: packet `(roll,pitch,yaw)` deg → `Quaternion.Euler(-pitch, -yaw+headingOffsetDeg, -roll)`.
+
+### STILL BROKEN — pick up here next session
+- **Canopy orientation still looks wrong** even with the test sender set to level
+  (`canopyRPY = [0,0,yaw]` now in `sim_to_unity.m`). "A bit better but still fucked up."
+  → If it's wrong with roll=0, the rotation conversion has a real sign/axis bug. Derive
+    the exact ENU(Z-up, deg RPY) → Unity attitude transform (proper `P·R·Pᵀ` conjugation
+    for the Y/Z axis swap), not just per-axis negation. Test against the level sender.
+- **The slider rectangle (the flat panel holding the suspension lines) doesn't look
+  right** (Sari, 2026-06-22). Investigate in `ProceduralCanopy.cs` (slider build:
+  `_sliderLocalY`, `_slHW`, `_slHD`, `MakeStaticLine` / riser attach). May be position,
+  size, or that it's not tracking the sim-driven canopy correctly while live.
+- Open question for the lab: does the **body heading** come from the sim or from XSens?
+  (`driveBodyRotation` toggles this.)
+
+---
+
+## First/third-person camera switcher (CameraViewController.cs, 2026-06-17)
+
+New `Assets/CameraViewController.cs` on the Main Camera. Keeps the head-tracked `VRCameraRig` active in **both** views (so look-around always works) and just changes what it follows + the offset — it does NOT hand off to `CameraFollow`'s LookAt, which would fight head rotation.
+
+- **First person** (default): rig follows the `firstPersonBone` you drag in (use the real `Head 1` bone — Hips-rooted, see duplicate-bone note), at `firstPersonOffset`.
+- **Third person**: rig swaps back to `VRCameraRig.followTarget` (canopy/avatar) and pulls back to `thirdPersonOffset` (default `(0,2,-14)`) so the whole canopy + pilot chute frame.
+- **Toggle**: V key (Editor) / Quest **B** button (right controller — A is restart) / `CameraViewController.Instance.SetView(bool)` for a future Matlab UDP flag.
+- **Desktop preview**: when no HMD is present it drives the camera itself (disables `CameraFollow`) so V visibly switches in the flat Editor. `firstPersonEuler` corrects bone facing in the Editor only (try 90/-90 on X) — irrelevant in VR where the HMD drives rotation.
+
+**Inspector wiring on Main Camera:** add `CameraViewController` → drag in `vrCameraRig`, `cameraFollow`, and `firstPersonBone` (= `Head 1`).
+
+**STILL TODO:** verify on the Quest 2 headset — confirm B toggles, first person sits at the eyes, third person frames the full canopy (tune `thirdPersonOffset`). Editor first-person facing may need `firstPersonEuler` tuning but that does not affect the headset.
+
+---
+
+## Richer environment (GroundEnvironment.cs, 2026-06-17)
+
+New `Assets/GroundEnvironment.cs` — attach to an empty `Environment` object at the world origin. Right-click the component header → **"Generate Environment"** scatters a low-poly **town (center) + fields of trees** across most of the map into a saved `EnvironmentBaked` child, then Cmd+S to keep it. **"Clear Environment"** to regenerate (change `seed` for a new layout).
+
+Design choices (per Sari): NOT a runtime chunk streamer — everything is placed up front so it's all visible from 500m with no pop-in. Keeps a clear landing circle around origin; props reuse a few shared URP/Lit materials + primitive meshes, colliders stripped, flagged Static for batching. Auto-raises `Camera.main` far-clip to 3000 + adds linear fog at launch so distant ground renders from altitude. Counts (~280 buildings / ~1400 trees), `areaHalfExtent`, `townHalfExtent`, `seed` all tunable.
+
+**STILL TODO (owner: Amir).** Two hard requirements from Sari that the final result must meet:
+1. **Visible from ANY height** — from the spawn altitude all the way to the ground, the
+   environment must never pop in or get culled. Push the camera far-clip high enough to cover
+   the full spawn height, and make sure distance fog isn't hiding the ground (the current
+   linear fog may need to be pushed out or dropped). No runtime chunk streaming — keep
+   everything placed up front.
+2. **Spreads as far as the eye can see** — fill the entire visible ground out to the horizon,
+   not just a patch around the landing zone. Increase `areaHalfExtent` / coverage so the props
+   reach the visible horizon at the spawn altitude.
+
+Then generate + save in the scene, tune density/area, and **test framerate on Quest 2** (lower
+counts / add LOD / GPU instancing if it dips). Confirm the VR rig camera is tagged `MainCamera`
+(or the far-clip bump won't apply). The current `GroundEnvironment.cs` (~280 buildings / ~1400
+trees, far-clip 3000) is the starting point — extend it to satisfy (1) + (2).
+
+---
+
+## Matlab-driven movement (SimulatorReceiver.cs, 2026-06-17)
+
+New `Assets/SimulatorReceiver.cs` — UDP receiver that replaces PlayerMovement's physics; Unity becomes a pure renderer of the lab/Matlab state. Listens on port **9764** (separate from the XSens skeleton stream on 9763, so both run at once). Each frame it applies canopy + skydiver position / orientation / linear+angular velocity to the Rigidbodies, stores wind (`SimulatorReceiver.Wind`), and feeds right/left steering into `PlayerMovement.SetToggles()` → existing `ToggleArmAnimation` converts those to shoulder pitch (arms up at 0, down at 1). It disables `PlayerMovement` so the two don't fight.
+
+**Wire protocol:** one UDP datagram = an ASCII line of 29 comma-separated numbers (canopy pos/ori/linvel/angvel, skydiver pos/ori/linvel/angvel, wind, right+left steer). Full field order documented at the top of `SimulatorReceiver.cs` and `Matlab/sim_to_unity.m`.
+
+**Test sender:** `Matlab/sim_to_unity.m` flies a 60s spiral descent with oscillating steering. Run it after pressing Play in Unity (set `SimulatorReceiver` port = 9764, wire canopy/body/playerMovement).
+
+**Setup:** add `SimulatorReceiver` to a GameObject, drag in the canopy + body Rigidbodies and the `PlayerMovement` component.
+
+**STILL TODO (2026-06-17 — connection confirmed working, but):**
+- **Rotation/coordinate-frame mapping needs tuning.** `frameMode` defaults to `EnuZupAerospace` (RH, Z-up, aerospace yaw/pitch/roll) → converted in `ConvPos`/`ConvRot`. Confirm the REAL lab/EOM output frame (likely NED or other) and fix the axis/sign mapping. Positions looked OK; orientations were off.
+- Decide who drives the **arms** when XSens is also connected — XSens mocap and `ToggleArmAnimation` both write the arm bones and will fight. Pick one (see "both connections at once" discussion).
+- Verify on the lab Windows PC against the real `EOM_Solver` stream.
+
+---
+
+## Next / planned (as of 2026-06-17)
+
+| Task | Priority | Notes |
+|------|----------|-------|
+| Test camera switcher on Quest 2 | MED | Code done (`CameraViewController.cs`). Put on the headset: confirm B toggles, eye position, and third-person framing; tune `thirdPersonOffset`. |
+| Richer environment (buildings, trees, props) | MED | Add real 3D ground props on top of `GrassGround.cs` + `SkyGrid.cs`. Keep Quest 2 perf in mind (low-poly, LOD, instancing). |
+| Skydiver/canopy movement via Matlab physics | HIGH | Drive avatar+canopy translation from the Matlab pipeline (`animate_to_unity.m` UDP + `EOM_Solver.dll` on the lab PC) instead of the pure-C# placeholder. Verify on the lab Windows machine. |
+
+---
+
+## Avatar has duplicate bones (important for any bone attachment)
+
+The imported avatar contains **two copies of every arm/hand bone**:
+- **Real skinned/animated bones** — nested under `Hips`, given a `" 1"` suffix by Unity to de-dupe the name (`Avatar/Hips/.../LeftShoulder 1/LeftElbow/LeftCarpus 1`). These move with the visible mesh; in the T-pose they spread along world **X** (`LeftCarpus 1` at X≈-0.79, `RightCarpus 1` at X≈+0.79).
+- **Flat reference nodes** — parented directly under `Avatar` (`Avatar/LeftCarpus`, `Avatar/jLeftWrist`, the `p*` landmarks). These sit at the torso (X≈0) and **never move**.
+
+When attaching anything to a hand/arm (cables, IK, `ToggleArmAnimation.cs`), target the **Hips-rooted `" 1"` bone**, not the flat `Avatar/<name>` / `j*` copy. `ProceduralCanopy.FindSkinnedBone()` does this automatically (matches the name ignoring a trailing `" 1"` and prefers the copy with a `Hips` ancestor).
 
 ---
 
@@ -213,7 +392,7 @@ Incoming UDP data per frame (port TBD — confirm with lab team):
 
 | Task | Priority | Notes |
 |------|----------|-------|
-| New UDP receiver for lab simulator | HIGH | Replace `PlayerMovement.cs` with a new script that listens on the lab simulator UDP port and applies incoming position/orientation/velocity to the canopy and body Rigidbodies each frame. Port TBD — confirm with lab. |
+| New UDP receiver for lab simulator | ◐ IN PROGRESS | `SimulatorReceiver.cs` done: listens 9764, freeze-until-stream, Sim=world/XSens=pose authority, position confirmed correct (Z-up). **Remaining: fix canopy orientation + slider rectangle** — see "Matlab / simulator integration" section above. Confirm real port with lab. |
 | Arm animation from steering inputs | HIGH | Steering input values (left/right, 0–1) come in the simulator UDP packet. Convert to shoulder pitch: 0 = arms fully up, 1 = arms fully down along body. Apply to RightShoulder and LeftShoulder bones. Purely visual — physics effect already handled by simulator. |
 | Ground environment — trees and buildings | MEDIUM | Add trees and buildings on the ground so the skydiver can see them growing larger as they descend from 500m. Use simple procedural geometry or low-poly prefabs — no high-detail assets needed. |
 | First/third person view toggle | MEDIUM | Switch camera at runtime three ways: (1) keyboard key, (2) Meta Quest controller button (same pattern as A = restart), (3) flag received in the Matlab UDP stream. First person = camera at avatar head. Third person = current follow camera. |

@@ -24,3 +24,6 @@ Thumbs.db
 
 # Crash logs
 crashlytics-build.properties
+
+# Mono/Unity crash dumps
+mono_crash.*.blob
