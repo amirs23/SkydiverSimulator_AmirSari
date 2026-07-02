@@ -107,6 +107,50 @@ Creates an 11×11 grid of spheres that follow the avatar to simulate flying thro
 - **Grid Size**: 5
 - **Spacing**: 10.0
 
+### `ProceduralCanopy.cs`
+Generates a complete ram-air parachute entirely at runtime — no external mesh needed. Replaces `Canopy_Rotated.obj` + `SuspensionLines.cs`.
+
+**What it builds:**
+- 9 inflated cells, each a different colour (red / yellow / blue / white / green / white / blue / yellow / red)
+- Correct parabolic arc — center highest, tips droop (like a real ram-air)
+- Full suspension line system: 4 lines per rib (A/B/C/D attachment points)
+- Slider
+- 4 risers (front-left, front-right, rear-left, rear-right)
+- 2 steering line cascades connecting to the pilot's hands
+- Pilot chute trailing behind
+
+**ProceduralCanopy scene setup (Sari — do this in the Editor):**
+1. Disable or delete the old `Canopy_Rotated` GameObject
+2. Disable `SuspensionLines` component (or the GameObject that holds it)
+3. Create a new empty GameObject → rename it `ProceduralCanopy`
+4. Add Component → **ProceduralCanopy**
+5. Wire the Inspector slots:
+   - **Follow Target** → drag the **Hips bone** from the Avatar skeleton (NOT the Avatar root — the root doesn't move; XSens drives bones directly)
+   - **Follow Offset** → `(0, 7, 0)` — canopy floats 7 m above the hips
+   - **Left Shoulder** → jLeftShoulder bone
+   - **Right Shoulder** → jRightShoulder bone
+   - **Left Hand** → pLeftTopOfHand bone
+   - **Right Hand** → pRightTopOfHand bone
+6. Save scene with **Cmd+S**
+
+**Why Follow Target must be the Hips bone:**
+The XSens Movella plugin animates bones (Hips, Spine, etc.) in `LateUpdate`. The Avatar root `transform.position` stays at (0,0,0) — it never moves. To track the avatar, the canopy must follow a bone that actually moves, and Hips is the stable root of the skeleton.
+
+### `ToggleArmAnimation.cs`
+Animates the avatar's upper-arm and forearm bones between two poses:
+- **Raised** — hands up, reaching for the toggles (neutral/no-pull)
+- **Pulled** — hands down at the hip (full toggle pull)
+
+**When to use:**
+- Enable when testing with Quest controllers or keyboard only
+- **Disable when using XSens Matlab pipeline** — the XSens plugin drives all arm bones directly; this script would conflict
+
+**Keyboard (Editor testing):** `A` = left toggle, `D` = right toggle, `Space` = both
+**Quest:** left trigger = left, right trigger = right
+**XSens pipeline:** arm positions come from the suit automatically, no script needed
+
+**Inspector slots:** leftUpperArm, leftForeArm, rightUpperArm, rightForeArm — drag the bones from the Avatar skeleton
+
 ### `PlayerMovement.cs`
 Controls physics simulation using EOM_Solver.
 - **Windows lab PC only** — on Mac/Quest the DLL call is skipped (state held constant via `#if UNITY_STANDALONE_WIN`)
@@ -142,11 +186,13 @@ Draws a pulsing orange bullseye on the ground as the target landing zone. Attach
 SkydiverSimulator_AmirSari/
 ├── Assets/
 │   ├── Canopy.obj              — wrong orientation, don't use
-│   ├── Canopy_Rotated.obj      — correct canopy mesh (arch curves up)
+│   ├── Canopy_Rotated.obj      — old canopy mesh (superseded by ProceduralCanopy.cs)
 │   ├── CameraFollow.cs         — camera tracks avatar
-│   ├── SuspensionLines.cs      — lines from canopy to shoulders
+│   ├── SuspensionLines.cs      — old suspension lines (superseded by ProceduralCanopy.cs)
 │   ├── SkyGrid.cs              — floating sphere grid
 │   ├── PlayerMovement.cs       — physics via EOM_Solver (Windows only, no-op on Mac/Quest)
+│   ├── ProceduralCanopy.cs     — ram-air canopy: 9 cells, suspension lines, slider, risers, pilot chute
+│   ├── ToggleArmAnimation.cs   — animates arms with toggle inputs (Quest/keyboard — disable with XSens)
 │   ├── VelocityArrows.cs       — cyan/yellow velocity direction arrows on canopy
 │   ├── WindEffect.cs           — cloud-sphere wind particles (sense of descent)
 │   ├── LandingZoneMarker.cs    — pulsing orange bullseye target on ground
