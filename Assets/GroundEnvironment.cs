@@ -81,11 +81,10 @@ public class GroundEnvironment : MonoBehaviour
 
     void Start()
     {
+        // Apply camera/fog settings only — props come from the pre-baked scene objects.
+        // To create the environment: right-click this component → "Generate Environment",
+        // then save the scene (Cmd+S). Nothing is generated at runtime.
         ApplyCameraSettings();
-
-        // If never baked in the editor, generate at runtime so the scene still works.
-        if (transform.Find(BakedName) == null)
-            Build(transform);
     }
 
     void ApplyCameraSettings()
