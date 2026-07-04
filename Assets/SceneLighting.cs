@@ -33,8 +33,8 @@ public class SceneLighting : MonoBehaviour
     [Tooltip("Use a 3-colour gradient ambient (nicer outdoors than flat skybox ambient).")]
     public bool useGradientAmbient = true;
     public Color skyColor     = new Color(0.55f, 0.70f, 0.95f);   // light blue overhead
-    public Color equatorColor = new Color(0.70f, 0.72f, 0.72f);   // hazy horizon
-    public Color groundColor  = new Color(0.30f, 0.32f, 0.25f);   // dim earth bounce
+    public Color equatorColor = new Color(0.55f, 0.68f, 0.55f);   // grass-tinted horizon haze
+    public Color groundColor  = new Color(0.18f, 0.42f, 0.12f);   // grass green earth bounce (matches GrassGround + SkyboxGrass)
     [Range(0f, 2f)] public float ambientIntensity = 1.15f;
 
     void OnEnable()  => Apply();
