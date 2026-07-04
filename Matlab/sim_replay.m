@@ -3,7 +3,7 @@
 % so you can test SimulatorReceiver.cs against REAL simulator data with no lab
 % hardware. Streams the exact 26 fields of the `x_s` struct, in struct order.
 %
-% Pure-Java UDP (no Instrument Control Toolbox needed) — same approach as
+% Pure-Java UDP (no Instrument Control Toolbox needed) -- same approach as
 % animate_to_unity.m. Run this AFTER pressing Play in Unity.
 %
 % WIRE FORMAT: one ASCII line of 26 comma-separated numbers per frame, matching
@@ -18,7 +18,19 @@
 % position Z reads as altitude). Angles in degrees, rates in rad/s.
 
 % --- config ---------------------------------------------------------------
-matFile  = '/Users/sarimorkos/projectA/VRproject/simPhysicsOutput/sim_out.mat'; % edit if moved
+% Look for sim_out.mat right next to this script (i.e. in the repo's Matlab
+% folder) so it works on any machine once the file is dropped in. Ask Sari to
+% share sim_out.mat and place it in this folder. To test WITHOUT the recording,
+% run sim_to_unity instead (synthetic flight, no data file needed).
+thisDir  = fileparts(mfilename('fullpath'));
+matFile  = fullfile(thisDir, 'sim_out.mat');
+if ~isfile(matFile)
+    error(['sim_replay: sim_out.mat not found in\n  %s\n' ...
+           'This is the lab simulator recording (not committed to GitHub -- ask Sari for it),\n' ...
+           'drop it into the Matlab folder, then run sim_replay again.\n' ...
+           'To test the pipeline WITHOUT it, run sim_to_unity instead.'], thisDir);
+end
+
 host     = '127.0.0.1';
 port     = 9764;          % must match SimulatorReceiver.listenPort
 sendRate = 50;            % Hz to send at (sim is logged at 100 Hz)
