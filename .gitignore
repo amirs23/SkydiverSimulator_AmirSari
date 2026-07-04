@@ -27,3 +27,6 @@ crashlytics-build.properties
 
 # Mono/Unity crash dumps
 mono_crash.*.blob
+
+# Local simulator recordings (each machine keeps its own; not shared via git)
+Matlab/sim_out.mat
