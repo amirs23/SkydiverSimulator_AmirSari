@@ -44,5 +44,8 @@ Matlab/sim_out.mat
 # Live Capture writes SettingsAssetBuild/, the test framework writes the run info.
 Assets/SettingsAssetBuild/
 Assets/SettingsAssetBuild.meta
-Assets/Resources/PerformanceTestRun*.json
-Assets/Resources/PerformanceTestRun*.json.meta
+# Assets/Resources/ currently holds ONLY test-framework run info (nothing calls
+# Resources.Load anywhere in Assets/). If real runtime resources are ever added,
+# delete these two lines and commit the folder.
+Assets/Resources/
+Assets/Resources.meta
