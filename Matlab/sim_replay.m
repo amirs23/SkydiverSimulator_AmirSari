@@ -31,7 +31,11 @@ if ~isfile(matFile)
            'To test the pipeline WITHOUT it, run sim_to_unity instead.'], thisDir);
 end
 
-host     = '127.0.0.1';
+% Destination IP. Default = the Unity Editor on this machine.
+% To stream to a headset, comment the line below, uncomment the next one, and put
+% YOUR device's IP there (per-network — the example is not a fixed address).
+host     = '127.0.0.1';        %if running in the Editor on this pc
+%host    = '192.168.68.100';   %if running on the device — replace with YOUR headset's IP
 port     = 9764;          % must match SimulatorReceiver.listenPort
 sendRate = 50;            % Hz to send at (sim is logged at 100 Hz)
 speed    = 1.0;           % playback speed multiplier (2.0 = twice as fast)

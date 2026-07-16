@@ -1,5 +1,12 @@
 # HANDOFF — SkydiverSimulator (VR Parachute, Quest 2)
-**Last updated: 2026-06-22 (Sari)**
+**Last updated: 2026-07-16 (Sari)**
+
+> 📖 **Start with `README.md`, not this file.** The README is the from-scratch guide: setup,
+> running in the Editor, deploying to the Quest, networking, the canopy, troubleshooting,
+> and the open tasks. **This file is a running session log** — deeper technical detail (wire
+> formats, frame math, session-by-session history) and useful once you're oriented, but it
+> is chronological and some sections describe superseded states. Where the two disagree,
+> **the README wins.**
 
 ---
 
@@ -142,18 +149,27 @@ The lab simulator → Matlab → Unity UDP pipeline. `SimulatorReceiver.cs` is o
 - Velocity: same axis swap (HUD only).
 - Rotation: packet `(roll,pitch,yaw)` deg → `Quaternion.Euler(-pitch, -yaw+headingOffsetDeg, -roll)`.
 
-### STILL BROKEN — pick up here next session
-- **Canopy orientation still looks wrong** even with the test sender set to level
-  (`canopyRPY = [0,0,yaw]` now in `sim_to_unity.m`). "A bit better but still fucked up."
-  → If it's wrong with roll=0, the rotation conversion has a real sign/axis bug. Derive
-    the exact ENU(Z-up, deg RPY) → Unity attitude transform (proper `P·R·Pᵀ` conjugation
-    for the Y/Z axis swap), not just per-axis negation. Test against the level sender.
-- **The slider rectangle (the flat panel holding the suspension lines) doesn't look
-  right** (Sari, 2026-06-22). Investigate in `ProceduralCanopy.cs` (slider build:
-  `_sliderLocalY`, `_slHW`, `_slHD`, `MakeStaticLine` / riser attach). May be position,
-  size, or that it's not tracking the sim-driven canopy correctly while live.
-- Open question for the lab: does the **body heading** come from the sim or from XSens?
-  (`driveBodyRotation` toggles this.)
+### ~~STILL BROKEN~~ — ✅ BOTH RESOLVED (2026-07-16). Kept so they aren't re-derived.
+
+- ~~**Canopy orientation still looks wrong**~~ → **Fixed 2026-06-29.** `ConvRot` now builds
+  the body axes from `R = Rz·Ry·Rx` and remaps NED→Unity via `LookRotation`, replacing the
+  old per-axis-negation hack. **Don't go back to per-axis negation.**
+- ~~**The slider rectangle doesn't look right**~~ (Sari, 2026-06-22) → **Fixed 2026-07-16 —
+  and it was never really about the slider.** Root cause: **the canopy's origin is its NOSE,
+  not its chord centre.** `AttachLocal` builds the chord as `z = -chord*chordFrac`, so the
+  geometry runs z = 0 (nose) → -chord (tail) and the true centre is `-chord/2`. The slider
+  *corners* were centred on `z = 0` — the pivot — so the suspension lines converged **half a
+  chord in front of** the slider mesh and never touched it, and every line row leaned forward
+  (the "`|/` instead of `\/`" symptom). The same root cause also made the canopy hang half a
+  chord **behind** the pilot and **rotate about its nose**, swinging the wing around him on
+  every turn. Fixed with a `_slCz` chord-centre term plus a *rotated* chord-centre offset in
+  `LateUpdate`. **The old "canopy pivot is off-center → apply an X offset" workaround is
+  obsolete — don't reintroduce it.** Full detail in README §8.
+- **STILL OPEN — does the body heading come from the sim or from XSens?**
+  (`driveBodyRotation` toggles this.) The canopy's yaw comes from the **simulator**, the
+  avatar's from **XSens**, and nothing ties the two reference frames together — in `.mvnx`
+  replay they can sit ~180° apart and the steering lines cross. `headingOffsetDeg` /
+  `invertHeading` exist for the sim side. **Needs a decision with the lab.** See README §12.
 
 ---
 
@@ -334,7 +350,7 @@ If the XSens avatar pipeline is needed:
 
 | Package | Version |
 |---------|---------|
-| `com.unity.xr.management` | 4.4.0 |
+| `com.unity.xr.management` | 4.6.0 |
 | `com.unity.xr.oculus` | 4.2.0 |
 
 These resolve automatically from `Packages/manifest.json` — no manual steps needed.
@@ -346,7 +362,10 @@ These resolve automatically from `Packages/manifest.json` — no manual steps ne
 - `EOM_Solver.dll` is x86-64 (Mac/Windows). If building on a different arch, the DLL may need recompilation in Matlab.
 - HUD shows zeros until `EOM_Solver` physics are running (canopy Rigidbody not assigned → shows 0,0,0).
 - XSens suit / Matlab stream is optional — avatar animates from XSens but the parachute physics are independent.
-- Never modify Anna's original Matlab scripts (`load_mvnx_and_animate.m`).
+- ~~Never modify Anna's original Matlab scripts (`load_mvnx_and_animate.m`).~~ **Removed
+  2026-07-16 — that file has never existed in this repo** (never tracked, not on disk). It
+  was a ghost rule, copied around and never checked. `Matlab/load_mvnx.m` is the real parser
+  and is fine to work with.
 
 ### RESOLVED: Head tracking (2026-05-26)
 Root cause: Unity 6 no longer auto-applies XR pose to a plain Main Camera.
