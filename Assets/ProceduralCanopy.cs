@@ -97,6 +97,29 @@ public class ProceduralCanopy : MonoBehaviour
     [Tooltip("Right hand / toggle grip point. Use the SKINNED 'RightCarpus' bone — NOT jRightWrist.")]
     public Transform rightHand;
 
+    // ── Slider ────────────────────────────────────────────────────────────────
+    // All four values are fractions so the slider scales with the canopy.
+    //
+    // These are read by InitSliderDims(), which only runs on Start() and on Bake —
+    // NOT every frame. Changing a value in the Inspector does nothing on its own.
+    // To see a change: right-click the component header → "Bake Canopy (static
+    // parts → scene)", then Cmd+S. That is the tuning loop; Play mode is not.
+    [Header("Slider")]
+    [Tooltip("How far the slider sits below the canopy, as a fraction of span. Larger = lower.")]
+    public float sliderDropFrac = 0.30f;
+
+    [Tooltip("Slider half-width, as a fraction of span. Larger = wider.")]
+    public float sliderHalfWidthFrac = 0.18f;
+
+    [Tooltip("Slider half-depth, as a fraction of chord. Larger = deeper.")]
+    public float sliderHalfDepthFrac = 0.22f;
+
+    [Tooltip("Where the slider centres along the chord, as a fraction of chord behind the " +
+             "canopy origin. The origin sits at the NOSE (geometry runs z = 0 → -chord), so " +
+             "0.5 = the true chord centre. This is the knob that fixes 'slider not centred' — " +
+             "before it existed the corners were centred on the origin, i.e. the nose.")]
+    public float sliderChordCentreFrac = 0.5f;
+
     // ── Line appearance ───────────────────────────────────────────────────────
     [Header("Suspension Lines")]
     [Tooltip("Base line width (metres). Risers render at 2× this. Keep above ~0.015 so the " +
@@ -105,6 +128,11 @@ public class ProceduralCanopy : MonoBehaviour
     public Color suspColor     = Color.white;
     [Tooltip("Steering lines are coloured differently to distinguish them.")]
     public Color steeringColor = new Color(1f, 0.8f, 0f);   // yellow
+
+    [Tooltip("How many trailing-edge attachment points cascade into each rear slider " +
+             "corner, counted inward from the wingtip. Real rigs use ~4 per side.")]
+    [Range(1, 6)]
+    public int steeringCascadeCount = 4;
 
     // ── Pilot chute ───────────────────────────────────────────────────────────
     [Header("Pilot Chute")]
@@ -126,6 +154,7 @@ public class ProceduralCanopy : MonoBehaviour
     float _sliderLocalY;   // local-Y of slider below the canopy origin
     float _slHW;           // slider half-width  (along span)
     float _slHD;           // slider half-depth  (along chord)
+    float _slCz;           // slider centre along chord (local-Z); canopy origin is the nose
 
     // Dynamic cables, rebuilt every Play:
     readonly List<LineRenderer> _riserLines = new List<LineRenderer>();  // FL, FR, RL, RR
@@ -229,8 +258,15 @@ public class ProceduralCanopy : MonoBehaviour
 
     void LateUpdate()
     {
+        // The canopy's origin is its NOSE (geometry runs z = 0 → -chord), but the pilot
+        // must hang under the wing's CENTRE. Offsetting by the rotated chord-centre
+        // vector puts the chord centre on the follow point, so the canopy banks about
+        // its own centre instead of swinging the whole wing around the pilot.
+        // Rotation is driven by SimulatorReceiver in FixedUpdate, so it is already
+        // current here (this script is [DefaultExecutionOrder(10000)]).
         if (followTarget != null)
-            transform.position = followTarget.position + followOffset;
+            transform.position = followTarget.position + followOffset
+                               + transform.rotation * new Vector3(0f, 0f, chord * 0.5f);
         UpdateDynamicLines();
     }
 
@@ -268,6 +304,7 @@ public class ProceduralCanopy : MonoBehaviour
         BuildCells(root);
         BuildSlider(root);
         BuildSuspensionLines(root);
+        BuildSteeringCascade(root);
         BuildPilotChute(root);
     }
 
@@ -276,9 +313,10 @@ public class ProceduralCanopy : MonoBehaviour
     // =========================================================================
     void InitSliderDims()
     {
-        _sliderLocalY = -(span * 0.30f);
-        _slHW         = span  * 0.18f;
-        _slHD         = chord * 0.22f;
+        _sliderLocalY = -(span  * sliderDropFrac);
+        _slHW         =   span  * sliderHalfWidthFrac;
+        _slHD         =   chord * sliderHalfDepthFrac;
+        _slCz         = -(chord * sliderChordCentreFrac);
     }
 
     // Vertical rise at span-position x due to the elliptical arc.
@@ -297,11 +335,14 @@ public class ProceduralCanopy : MonoBehaviour
         return new Vector3(x, y, z);
     }
 
-    // Local-space slider corner positions
-    Vector3 SL_FL() => new Vector3(-_slHW, _sliderLocalY,  _slHD);
-    Vector3 SL_FR() => new Vector3( _slHW, _sliderLocalY,  _slHD);
-    Vector3 SL_RL() => new Vector3(-_slHW, _sliderLocalY, -_slHD);
-    Vector3 SL_RR() => new Vector3( _slHW, _sliderLocalY, -_slHD);
+    // Local-space slider corner positions.
+    // Centred on _slCz (the chord centre), NOT on the canopy origin — the origin is the
+    // nose, so centring here on z = 0 put the front corners ahead of the leading edge and
+    // left the lines converging half a chord in front of the slider mesh.
+    Vector3 SL_FL() => new Vector3(-_slHW, _sliderLocalY, _slCz + _slHD);
+    Vector3 SL_FR() => new Vector3( _slHW, _sliderLocalY, _slCz + _slHD);
+    Vector3 SL_RL() => new Vector3(-_slHW, _sliderLocalY, _slCz - _slHD);
+    Vector3 SL_RR() => new Vector3( _slHW, _sliderLocalY, _slCz - _slHD);
 
     // =========================================================================
     // CELL MESHES
@@ -453,7 +494,7 @@ public class ProceduralCanopy : MonoBehaviour
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
         go.name = "Slider";
         go.transform.SetParent(root, false);
-        go.transform.localPosition = new Vector3(0f, _sliderLocalY, -chord * 0.5f);
+        go.transform.localPosition = new Vector3(0f, _sliderLocalY, _slCz);
         go.transform.localScale    = new Vector3(_slHW * 2f, 0.012f, _slHD * 2f);
         SafeDestroy(go.GetComponent<BoxCollider>());
 
@@ -486,6 +527,32 @@ public class ProceduralCanopy : MonoBehaviour
             MakeStaticLine(root, "SuspB", AttachLocal(ribX, CF[1]), frontCor);
             MakeStaticLine(root, "SuspC", AttachLocal(ribX, CF[2]), rearCor);
             MakeStaticLine(root, "SuspD", AttachLocal(ribX, CF[3]), rearCor);
+        }
+    }
+
+    // =========================================================================
+    // STEERING CASCADE  (static — trailing edge → rear slider corners)
+    // The upper half of each steering line. On a real rig several trailing-edge
+    // attachment points converge into one line that passes through the rear slider
+    // grommet and carries on down to the toggle; the toggle segment itself is
+    // dynamic (it tracks the hand) and lives in UpdateDynamicLines.
+    // Both ends are inside the canopy, so this rides rigidly with it and bakes.
+    // =========================================================================
+    void BuildSteeringCascade(Transform root)
+    {
+        float   cellW = span / cellCount;
+        Vector3 slRL  = SL_RL(), slRR = SL_RR();
+        int     n     = Mathf.Clamp(steeringCascadeCount, 1, cellCount);
+
+        // Count inward from each wingtip: the outer cells are what actually steer.
+        for (int i = 0; i < n; i++)
+        {
+            float xL = -span * 0.5f + i * cellW;
+            float xR =  span * 0.5f - i * cellW;
+
+            // chordFrac 1 = trailing edge; midHeight false = lower surface.
+            MakeStaticLine(root, "SteerCascadeL", AttachLocal(xL, 1f, false), slRL, steeringColor);
+            MakeStaticLine(root, "SteerCascadeR", AttachLocal(xR, 1f, false), slRR, steeringColor);
         }
     }
 
@@ -535,8 +602,9 @@ public class ProceduralCanopy : MonoBehaviour
         for (int i = 0; i < 4; i++)
             _riserLines.Add(MakeLR(root, "Riser", suspColor, lineWidth * 2f, 2, worldSpace: true));
 
-        // 4 steering lines (left×2, right×2) — 2 points: canopy underside → hand
-        for (int i = 0; i < 4; i++)
+        // 2 steering lines (left, right) — 2 points: rear slider corner → hand.
+        // The cascade above the slider is static; only this toggle segment moves.
+        for (int i = 0; i < 2; i++)
             _steerLines.Add(MakeLR(root, "Steer", steeringColor, lineWidth, 2, worldSpace: true));
 
         if (showToggleHandles)
@@ -566,7 +634,7 @@ public class ProceduralCanopy : MonoBehaviour
 
     void UpdateDynamicLines()
     {
-        if (_riserLines.Count < 4 || _steerLines.Count < 4) return;
+        if (_riserLines.Count < 4 || _steerLines.Count < 2) return;
 
         // Slider corners in world space
         Vector3 slFL = transform.TransformPoint(SL_FL());
@@ -585,20 +653,17 @@ public class ProceduralCanopy : MonoBehaviour
         _riserLines[2].SetPositions(new[] { slRL, lSh });   // rear-left
         _riserLines[3].SetPositions(new[] { slRR, rSh });   // rear-right
 
-        // ── Steering lines → hands ──────────────────────────────────────────
-        // The canopy's wingspan runs along X but the avatar's hands sit on the Z
-        // axis, so the canopy's own slider corners don't line up with the hands.
-        // Rather than fight that, each steering line is a simple near-vertical cable:
-        // the TOP sits on the canopy's lower surface directly above the hand, the
-        // BOTTOM is the hand itself. When the hand pulls down the cable just shortens,
-        // clearly showing the steering input. Two lines per hand, slightly spread.
+        // ── Steering lines: rear slider corner → hand (toggle) ──────────────
+        // This is the lower half of the real routing (see BuildSteeringCascade for the
+        // upper half). On a real rig the steering line runs from the trailing edge,
+        // through the rear slider grommet, down to the toggle — so this segment starts
+        // at the rear slider corner, NOT on the canopy. It stays dynamic and anchored
+        // to the resolved hand bone, so with a mocap suit on it reads as real steering.
         Vector3 lH = leftHand  ? leftHand.position  : lSh + Vector3.down * 0.55f;
         Vector3 rH = rightHand ? rightHand.position : rSh + Vector3.down * 0.55f;
 
-        SetSteerCable(_steerLines[0], lH, -0.12f);
-        SetSteerCable(_steerLines[1], lH,  0.12f);
-        SetSteerCable(_steerLines[2], rH, -0.12f);
-        SetSteerCable(_steerLines[3], rH,  0.12f);
+        _steerLines[0].SetPositions(new[] { slRL, lH });   // rear-left  grommet → left hand
+        _steerLines[1].SetPositions(new[] { slRR, rH });   // rear-right grommet → right hand
 
         if (_handleL) PlaceToggleHandle(_handleL, lH);
         if (_handleR) PlaceToggleHandle(_handleR, rH);
@@ -618,22 +683,13 @@ public class ProceduralCanopy : MonoBehaviour
     // HELPERS
     // =========================================================================
 
-    // One steering cable: top anchored on the canopy's lower surface directly above
-    // the hand (offset slightly along the span so the pair reads as two lines), bottom
-    // at the hand. xOffset is in canopy-local span units.
-    void SetSteerCable(LineRenderer lr, Vector3 handWorld, float xOffset)
-    {
-        Vector3 hLoc = transform.InverseTransformPoint(handWorld);
-        float   lx   = Mathf.Clamp(hLoc.x + xOffset, -span * 0.5f, span * 0.5f);
-        float   lz   = Mathf.Clamp(hLoc.z, -chord, 0f);              // keep within the canopy footprint
-        Vector3 top  = transform.TransformPoint(new Vector3(lx, ArcY(lx), lz));   // on the lower surface
-        lr.SetPositions(new[] { top, handWorld });
-    }
-
     // Static local-space line between two local-space points (2 waypoints).
     void MakeStaticLine(Transform root, string name, Vector3 aLocal, Vector3 bLocal)
+        => MakeStaticLine(root, name, aLocal, bLocal, suspColor);
+
+    void MakeStaticLine(Transform root, string name, Vector3 aLocal, Vector3 bLocal, Color col)
     {
-        var lr = MakeLR(root, name, suspColor, lineWidth, 2, worldSpace: false);
+        var lr = MakeLR(root, name, col, lineWidth, 2, worldSpace: false);
         lr.SetPositions(new[] { aLocal, bLocal });
     }
 

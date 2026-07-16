@@ -25,7 +25,11 @@
 % Frame = simulator NED (X north/forward, Y east/right, Z down), 3-2-1 Euler degrees.
 % Position Z is sent as ALTITUDE (matches the example data + positionZIsAltitude=ON).
 
-host = '127.0.0.1';
+% Destination IP. Default = the Unity Editor on this machine.
+% To stream to a headset, comment the line below, uncomment the next one, and put
+% YOUR device's IP there (it is per-network — the example is not a fixed address).
+host = '127.0.0.1';         %if running in the Editor on this pc
+%host = '192.168.68.100';   %if running on the device — replace with YOUR headset's IP
 port = 9764;          % must match SimulatorReceiver.listenPort
 rate = 50;            % Hz
 T    = 60;            % seconds to fly

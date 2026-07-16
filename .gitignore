@@ -30,3 +30,19 @@ mono_crash.*.blob
 
 # Local simulator recordings (each machine keeps its own; not shared via git)
 Matlab/sim_out.mat
+
+# Android/Quest build output. Unity drops these beside the project, so the [Bb]uild/
+# rules above don't catch them. The BackUpThisFolder one is ~645 MB and the APK ~66 MB
+# — both way over GitHub's 100 MB per-file limit.
+*.apk
+*.aab
+*_BurstDebugInformation_DoNotShip/
+*_BackUpThisFolder_ButDontShipItWithYourGame/
+.utmp/
+
+# Injected into Assets/ during a build and normally cleaned up afterwards:
+# Live Capture writes SettingsAssetBuild/, the test framework writes the run info.
+Assets/SettingsAssetBuild/
+Assets/SettingsAssetBuild.meta
+Assets/Resources/PerformanceTestRun*.json
+Assets/Resources/PerformanceTestRun*.json.meta

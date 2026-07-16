@@ -19,7 +19,14 @@ end
 
 % Open UDP socket using Java (no toolbox required)
 socket  = java.net.DatagramSocket();
-address = java.net.InetAddress.getByName('127.0.0.1');
+% Destination IP. Default = the Unity Editor on this machine.
+% To stream to a headset, comment the line below, uncomment the next one, and put
+% YOUR device's IP there (per-network — the example is not a fixed address).
+% NOTE: on-device pose needs XsensUDPReceiver in the scene. The Live Capture plugin
+% is Editor-only and never binds 9763 in a build — see TASKS.md.
+address = java.net.InetAddress.getByName('127.0.0.1');    %if running inside the editor
+%address = java.net.InetAddress.getByName('192.168.68.100'); %on headset — YOUR device's IP
+
 
 start_time      = cputime;
 message_counter = 1;
