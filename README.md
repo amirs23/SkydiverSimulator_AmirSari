@@ -35,9 +35,8 @@ Matlab. Unity itself computes no physics — it is a renderer.
 8. [The canopy — how it's built and how to change it](#8-the-canopy--how-its-built-and-how-to-change-it)
 9. [Camera, views, and controls](#9-camera-views-and-controls)
 10. [Troubleshooting](#10-troubleshooting)
-11. [Known issues and permanent notes](#11-known-issues-and-permanent-notes)
-12. [Open tasks](#12-open-tasks)
-13. [Git workflow](#13-git-workflow)
+11. [Permanent notes — read before changing anything](#11-permanent-notes--read-before-changing-anything)
+12. [Git workflow](#12-git-workflow)
 
 ---
 
@@ -97,7 +96,7 @@ This surprises everyone, so it is stated up front:
 | **Pose (9763)** | `XsensDevice` — the Live Capture plugin | **`XsensUDPReceiver.cs`** — a plain UDP socket |
 | **Position (9764)** | `SimulatorReceiver.cs` | `SimulatorReceiver.cs` (same) |
 
-**The XSens plugin cannot work in a build — this is by design, not a bug.** It receives
+**The XSens plugin cannot work in a build — this is by design.** It receives
 data through a Live Capture *Connection*, and in
 `com.unity.live-capture/Runtime/Core/Communication/ConnectionManager.cs` the only call that
 loads saved connections is wrapped in `#if UNITY_EDITOR`. In a player build that line is
@@ -300,7 +299,7 @@ check `logcat` (§5c) to see whether packets are arriving.
 
 | GameObject | Role |
 |---|---|
-| `Avatar` | The skydiver. XSens sample FBX, **Humanoid** rig. Carries `XsensDevice` (the Editor pose path) + `Animator`. Also carries `DevColorize` — a development tint helper that should come off before this ships ([§12](#12-open-tasks) #8). |
+| `Avatar` | The skydiver. XSens sample FBX, **Humanoid** rig. Carries `XsensDevice` (the Editor pose path) + `Animator`, and `DevColorize` (a development tint helper — see the scripts table below). |
 | `Parachute` | `ProceduralCanopy` — the whole canopy, built in code. See [§8](#8-the-canopy--how-its-built-and-how-to-change-it). |
 | `PhysicsController` | `SimulatorReceiver` (UDP 9764) + `PlayerMovement`. |
 | `XsensUDP` | `XsensUDPReceiver` — the **build** pose path (UDP 9763). Mode = BuildsOnly. |
@@ -321,11 +320,11 @@ check `logcat` (§5c) to see whether packets are arriving.
 | `CameraViewController.cs` | `Main Camera` | First/third-person. **V** (Editor) / Quest **B** button / `Instance.SetView(bool)`. |
 | `VRCameraRig.cs` | `Main Camera` | Quest head tracking. Falls back to desktop mode if no HMD appears within 5 s. |
 | `PlayerMovement.cs` | `PhysicsController` | **Legacy standalone physics — not the live path.** `SimulatorReceiver` disables it whenever the simulator stream is running, which is normal operation. See [§7 Native](#native). Still owns two things that *are* live: **restart** ([§9](#9-camera-views-and-controls)) and `startHeight` (default 500 m — lower it to test near the ground). Also exposes `LeftToggle`/`RightToggle`/`SetToggles()`, which `SimulatorReceiver` drives from the stream's `delta_l`/`delta_r`. |
-| `DevColorize.cs` | `Avatar` (and possibly others) | **Development only** — tints objects for visibility. Should be removed before this ships. See [§12](#12-open-tasks) #8. |
-| `Editor/FixXsensMaterials.cs` | Editor menu | **Tools → Fix Xsens Materials for URP.** Converts the XSens sample materials from the built-in Standard shader to URP/Lit. Run-once, already done — but see [§11](#11-known-issues-and-permanent-notes) if the avatar ever turns invisible on the headset. |
-| `GroundEnvironment.cs` | `Environment` | Edit-time baker: right-click → **Generate Environment** → town + trees into a saved `EnvironmentBaked` child (nothing is generated at runtime). Raises the camera far-clip to 5000 m and pushes fog past the map edge so the ground stays visible from altitude. **The scene is currently baked at `areaHalfExtent: 900` (a 1.8 × 1.8 km patch), 280 buildings, 1400 trees** — note the *script defaults* are 3000 m / larger counts, and the scene overrides them. Re-bake after changing any of it. See [§12](#12-open-tasks) #6. |
+| `DevColorize.cs` | `Avatar` (and possibly others) | **Development only** — tints objects a flat colour so they're easy to pick out while working. Remove the component from the Inspector when you want the real materials. |
+| `Editor/FixXsensMaterials.cs` | Editor menu | **Tools → Fix Xsens Materials for URP.** Converts the XSens sample materials from the built-in Standard shader to URP/Lit. Run-once, already done — but see [§11](#11-permanent-notes--read-before-changing-anything) if the avatar ever renders invisible on the headset. |
+| `GroundEnvironment.cs` | `Environment` | Edit-time baker: right-click → **Generate Environment** → town + trees into a saved `EnvironmentBaked` child (nothing is generated at runtime). Raises the camera far-clip to 5000 m and pushes fog past the map edge so the ground stays visible from altitude. **The scene is baked at `areaHalfExtent: 900`** — a 1.8 × 1.8 km patch, 280 buildings, 1400 trees. The *script defaults* are larger (3000 m); **the scene values win**. `areaHalfExtent`, the counts, and `seed` are all tunable — raise the extent for more ground coverage from altitude, lower the counts if the headset framerate drops. **Re-bake after changing any of it** (§8). |
 | `SceneLighting.cs` | `Lighting` | Sun, soft shadows, gradient ambient. |
-| `ToggleArmAnimation.cs` | *not attached* | Swings the arms to match toggle input. **Conflicts with XSens**, which drives the same bones — see [§12](#12-open-tasks). |
+| `ToggleArmAnimation.cs` | *not attached* | Swings the arms to match toggle input, so steering is visible with no mocap suit. **Deliberately unattached: XSens drives the same arm bones**, so the two would write over each other. The rule is one or the other — with a suit live, XSens owns the arms and this stays off; with no suit, attach it to see the toggles move. |
 | `SuspensionLines.cs`, `Canopy_Rotated.obj` | *unused* | **Legacy**, superseded by `ProceduralCanopy`. Kept for reference. |
 
 ### Matlab — `Matlab/`
@@ -381,32 +380,38 @@ script or its Inspector values has **no visible effect** until you re-bake:
 4. Confirm with `git status` that `Integration_Ready.unity` actually changed.
 
 > **The APK is built from the scene *file*, not from your Editor session.** An unsaved bake
-> means the Editor looks right while the headset stays wrong. That exact trap cost a full
-> session on 2026-07-16. The `git status` check is what makes it visible.
+> means the Editor looks right while the headset doesn't. The `git status` check in step 4
+> is what makes that visible — don't skip it.
 
 **Static** (baked, rides rigidly with the canopy): cells, slider, suspension lines, steering
 cascade, pilot chute. **Dynamic** (rebuilt every `LateUpdate`, in world space): the risers
 and the steering line's toggle segment — because they attach to *moving bones*.
 
-### The geometry, and the one bug worth knowing about
+### The geometry — the canopy's origin is its NOSE, not its centre
 
-**The canopy's origin is its NOSE, not its centre.** `AttachLocal()` builds the chord as
-`z = -chord * chordFrac`, so the geometry runs from `z = 0` (leading edge) back to
-`z = -chord` (trailing edge). The true chord centre is at `z = -chord/2`.
+This is the single most important thing to know before you touch this script.
 
-Anything centred on `z = 0` is centred on the **pivot**, not the wing. That single fact
-caused three long-standing bugs, all fixed on 2026-07-16:
+`AttachLocal()` builds the chord as `z = -chord * chordFrac`, so the geometry runs from
+`z = 0` (leading edge) back to `z = -chord` (trailing edge). The true chord centre is at
+`z = -chord/2` — **not** at zero.
 
-- the slider's corners sat half a chord in front of the slider mesh, so the suspension lines
-  never touched it and all leaned forward;
-- the canopy hung a half-chord behind the pilot, **and rotated about its nose** — swinging
-  the whole wing around him on every turn;
-- the steering lines were faked as vertical cables because the real corners "didn't line up".
+**So anything you centre on `z = 0` is centred on the pivot, not on the wing.** Half a chord
+is about 1.1 m on this canopy, which is enough to put the slider corners ahead of the
+leading edge, hang the wing behind the pilot, and — because the canopy rotates about its
+own origin — swing it around him on every turn.
 
-`_slCz` now carries the chord centre, and `LateUpdate` offsets the canopy by the *rotated*
-chord-centre vector so it banks about its own centre. **If the geometry ever looks
-off-centre again, check `_slCz` and that `LateUpdate` offset first** — don't reach for the
-old "apply an X offset to the mesh" workaround, which is obsolete.
+Two pieces of the script exist to handle this, and both should be left alone:
+
+- **`_slCz`** carries the chord centre, and every slider corner derives from it. `BuildSlider`
+  reads the same `_slCz` rather than recomputing `-chord*0.5f` independently — one source,
+  so the two can't disagree.
+- **`LateUpdate`** offsets the canopy by the *rotated* chord-centre vector, so the centre
+  lands on the follow point and the wing banks about itself. The centre holds 0.00 m from
+  the pilot at every yaw.
+
+**If the geometry ever looks off-centre, check `_slCz` and that `LateUpdate` offset first.**
+Don't reach for an X offset on the mesh's local position — that treats the symptom and
+fights the two mechanisms above.
 
 ### Steering lines follow the real rig
 
@@ -423,10 +428,10 @@ on a re-bake** (see above).
 
 | Field | Default | Meaning |
 |---|---|---|
-| `sliderDropFrac` | `0.30` | How far below the canopy the slider sits, as a fraction of span. Larger = lower. **Currently under review — see [§12](#12-open-tasks).** |
+| `sliderDropFrac` | `0.30` | How far below the canopy the slider sits, as a fraction of span. Larger = lower. **Set this by eye against Dr. Clarke's rig diagram**, which shows the slider low, just above the risers — where it ends up on a fully-open canopy. It can't be computed offline: the Inspector-assigned bones are the flat non-moving copies, and the real skinned `" 1"` bones only exist at runtime (see below). |
 | `sliderHalfWidthFrac` | `0.18` | Slider half-width (fraction of span). |
 | `sliderHalfDepthFrac` | `0.22` | Slider half-depth (fraction of chord). |
-| `sliderChordCentreFrac` | `0.5` | Where the slider centres along the chord. `0.5` = the true centre. **This is the knob that fixes "slider not centred"** — before it existed, the corners were centred on the nose. |
+| `sliderChordCentreFrac` | `0.5` | Where the slider centres along the chord. `0.5` = the true chord centre, which is what you want — see the nose-vs-centre note above. |
 | `steeringCascadeCount` | `4` | Trailing-edge attachment points per side. Real rigs use ~4. |
 
 ### ⚠️ The avatar has duplicate bones
@@ -438,10 +443,13 @@ torso and never move.
 
 **Anything that attaches to a bone must resolve to the Hips-rooted `" 1"` copy.**
 `ProceduralCanopy.FindSkinnedBone()` does this (it ignores a trailing `" N"` and prefers the
-copy with a `Hips` ancestor), and `XsensUDPReceiver` mirrors the same logic. A plain
-`transform.Find("LeftCarpus")` binds the dead copy — packets arrive perfectly and nothing
-visibly moves, which is a miserable thing to debug. This was the original "steering lines
-pinned to the torso" bug.
+copy with a `Hips` ancestor), and `XsensUDPReceiver` mirrors the same logic. Use one of
+those rather than writing a fresh lookup.
+
+> A plain `transform.Find("LeftCarpus")` silently binds the dead copy. Everything looks
+> correct — the object is found, packets arrive, no errors — and nothing moves, because
+> you've attached to a node that sits at the torso and never animates. It is worth knowing
+> the shape of this in advance, because nothing about it announces itself.
 
 ---
 
@@ -507,8 +515,8 @@ See [§1](#1-how-the-system-works).
 XR failed to initialise. Check **Edit → Project Settings → XR Plug-in Management → Android →
 Oculus** is ticked, **and** that `ProjectSettings.asset`'s `preloadedAssets` still lists
 `XRGeneralSettingsPerBuildTarget.asset` and `OculusSettings.asset`. Unity silently strips
-those if the Oculus package ever goes missing, and without them XR never starts. This has
-happened once already.
+those two entries if the Oculus package ever goes missing from the manifest, and without
+them XR never starts.
 
 **The canopy looks wrong after I changed something.**
 You probably didn't re-bake, or you baked in Play mode. See
@@ -519,30 +527,34 @@ the headset. Put it on and accept it.
 
 **`adb devices` is empty.** Developer Mode is off, or the cable is charge-only.
 
-> ⚠️ **Don't start debugging the coordinate maths.** The instinct when motion looks wrong is
-> that Unity and Matlab/XSens disagree on coordinates. On the companion AR project that
-> hypothesis was investigated and **ruled out**; a conjugate-quaternion "fix" was tried and
-> **reverted**. The real cause was the rig type. The conversion used here —
-> `Vector3(-py, pz, px)` · `Quaternion(qy, -qz, -qx, qw)` — is the one that was verified
-> working on-device. Check the Editor state before the algebra.
+> ⚠️ **Don't start rewriting the coordinate maths.** When motion looks wrong the instinct is
+> that Unity and Matlab/XSens disagree on coordinates. **The conversion here is correct and
+> verified on-device:** `Vector3(-py, pz, px)` · `Quaternion(qy, -qz, -qx, qw)`, matching the
+> companion AR project. The same hypothesis was chased there, a conjugate-quaternion
+> alternative was tried, and it had to be reverted — the cause was the **rig type**, not the
+> algebra. **Check the Editor state first: rig type, bone bindings, connection.**
 
 ---
 
-## 11. Known issues and permanent notes
+## 11. Permanent notes — read before changing anything
 
-- **The XSens plugin cannot work in a build.** Not a bug, not fixable by configuration —
-  Live Capture is Editor-only by construction. `XsensUDPReceiver.cs` is the build path.
-  See [§1](#1-how-the-system-works).
+Each of these is a design decision that looks like an oversight from the outside. They are
+here so the next person doesn't spend a day "correcting" something that is already right.
+
+- **The XSens plugin cannot work in a build — this is by construction.** Live Capture is an
+  Editor tool; players were never in scope. It is not fixable by configuration.
+  `XsensUDPReceiver.cs` is the build path. See [§1](#1-how-the-system-works).
 - **Never run the plugin and `XsensUDPReceiver` at once.** Both write the same bones and
   both want port 9763. `Mode = BuildsOnly` keeps them apart — leave it.
 - **Re-bake in Edit mode, save, and verify with `git status`.** A bake that lives only in a
   Play-mode session or an unsaved Editor is a bake that doesn't exist. The APK reads the
   file.
-- **`com.unity.xr.oculus` keeps getting removed.** It has been dropped from
-  `manifest.json` more than once because it is old (`4.2.0` declares `unity: 2022.3`) and
-  awkward on Mac. **Without it there is no Quest build at all.** It currently resolves fine
-  alongside `xr.management 4.6.0`. If it needs replacing, the candidates are
-  `com.unity.xr.oculus` 4.3.0+ or the Meta XR SDK — but replace it, don't just delete it.
+- **`com.unity.xr.oculus` must stay in `manifest.json` — don't remove it.** It looks
+  removable: `4.2.0` declares `unity: 2022.3`, two majors behind this editor, and it is
+  awkward on Mac. **Without it there is no Quest build at all.** It resolves fine alongside
+  `xr.management 4.6.0` (it only requires ≥ 4.4.0). If it ever needs replacing, the
+  candidates are `com.unity.xr.oculus` 4.3.0+ or the Meta XR SDK — **replace it, don't just
+  delete it**, and expect the XR preload entries to need restoring afterwards (see §10).
 - **The flight comes from Dr. Clarke's team's simulator, over UDP 9764 — nothing else.**
   `EOM_Solver.dll` and `PlayerMovement`'s built-in physics are **legacy and not in use**;
   `SimulatorReceiver` disables them whenever the stream is live. Don't debug them, don't
@@ -552,15 +564,15 @@ the headset. Put it on and accept it.
   See [§6](#6-networking--the-part-that-catches-everyone).
 - **Bone attachments must use the Hips-rooted `" 1"` bones.** See
   [§8](#8-the-canopy--how-its-built-and-how-to-change-it).
-- **`m_Channels: 3` on `XsensDevice` is correct — don't "fix" it to `2`.** Reading the scene
-  file you'll see `m_Channels: 3` (`Position | Rotation`), while the companion AR project
-  runs `2` (rotation-only), and everything here describes the pose path as rotation-only.
-  That looks like a bug. It isn't. `3` is the **package's own default**; AR's `2` is the
-  deliberate deviation. With `applyRootMotion` off, the plugin writes only the Pelvis's
-  **local Y** (`XsensDevice.cs` ~line 418) — a local transform on a child bone. The Avatar
-  **root**, which is what `SimulatorReceiver` positions, is never touched, so there is no
-  authority conflict. It is also **Editor-only**: builds use `XsensUDPReceiver`
-  ([§1](#1-how-the-system-works)). The system works as-is — leave it alone.
+- **`m_Channels: 3` on `XsensDevice` is correct — don't "fix" it to `2`.** In the scene file
+  it reads `m_Channels: 3` (`Position | Rotation`), while the companion AR project runs `2`
+  (rotation-only) and everything here describes the pose path as rotation-only. The
+  mismatch is not a problem: `3` is the **package's own default** (AR's `2` is the deliberate
+  deviation), and with `applyRootMotion` off the plugin writes only the Pelvis's **local Y**
+  (`XsensDevice.cs` ~line 418) — a local transform on a child bone. The Avatar **root**,
+  which is what `SimulatorReceiver` positions, is never touched, so the authority split in
+  [§1](#1-how-the-system-works) holds. It is **Editor-only** regardless: builds use
+  `XsensUDPReceiver`. **Leave it as it is.**
 - **If the avatar is invisible on the Quest, it's the materials — not the rig.** The XSens
   sample materials ship on the built-in **Standard** shader, which Unity **strips from
   Android URP builds**, so the avatar renders as nothing on device while looking fine in the
@@ -575,34 +587,26 @@ the headset. Put it on and accept it.
   HMD's room-scale offset. **If head tracking ever "stops working", check that this script
   is alive before suspecting the headset** — and don't "simplify" it by deleting the manual
   write.
-- **Doc-drift warning.** This README has previously recorded a fix in one section while
-  leaving the contradicting claim live in another — and once described the project as built
-  on a previous student's system, which it is not. **When a fix lands, update every section
-  it touches in the same commit.**
+- **The canopy's heading and the avatar's heading come from different sources.** The canopy's
+  yaw comes from the **simulator**; the avatar's comes from **XSens**. They are two
+  independent reference frames with nothing tying them together, so in `.mvnx` replay they
+  can sit ~180° apart. `SimulatorReceiver` exposes `headingOffsetDeg` and `invertHeading` to
+  align the simulator side. **This is a frame-alignment knob, not an avatar problem** — with
+  a live suit the avatar faces wherever the wearer faces. **Do not try to correct it by
+  rotating the avatar root:** the plugin composes `inverseParent * absoluteOrientation`, so
+  the parent cancels out exactly and rotating the root does nothing at all.
+- **`SimulatorReceiver.positionZIsAltitude` is ON**, which makes the avatar descend
+  correctly on the lab's example data. The example data reads `z` as altitude while `Vz` is
+  down-positive, so the two conventions in it don't agree — the flag is what reconciles
+  them. If absolute descent direction ever looks inverted against a new data source, this is
+  the switch.
+- **Keep every section in step.** This README is the only document here, and a fact recorded
+  in one section while its contradiction stays live in another is worse than no note at all.
+  **When something changes, update every section it touches in the same commit.**
 
 ---
 
-## 12. Open tasks
-
-| # | Task | Where |
-|---|---|---|
-| 1 | **Slider height.** Dr. Clarke's rig diagram shows the slider **low, just above the risers** — where it ends up on a fully-open canopy. Ours sits at `sliderDropFrac = 0.30`. Raise it and re-bake (§8). Must be judged **by eye**: the riser height can't be computed offline, because the Inspector-assigned bones are the flat non-moving copies and the real ones only exist at runtime. (This deliberately overrides an older written spec that said "roughly halfway down the lines" — **the diagram wins**.) | 🏠 any machine |
-| 2 | **Confirm the position-Z sign convention with the lab.** `SimulatorReceiver.positionZIsAltitude` is currently **ON**; the example data is internally inconsistent. Needs a human answer from the simulator's authors. | 💬 lab |
-| 3 | **Arm ownership — XSens vs `ToggleArmAnimation`.** Both write the same arm bones. Decide the rule: if the suit is live, XSens wins and `ToggleArmAnimation` must be disabled; with no suit, enable it so the toggles are visible. Currently unattached. | 🏠 any machine |
-| 4 | **Verify `SimulatorReceiver` against the real `EOM_Solver` output** on the lab Windows PC — confirm the live stream really matches the 26-field format. | 🔬 lab PC |
-| 5 | **Canopy and avatar headings come from different sources.** The canopy's yaw comes from the **simulator**; the avatar's comes from **XSens**. Nothing ties the two reference frames together, so in `.mvnx` replay they can sit ~180° apart and the steering lines cross. `SimulatorReceiver` already has `headingOffsetDeg` / `invertHeading` for the sim side. Related to #3. | 🔬 needs the suit |
-| 6 | **`GroundEnvironment` — reconcile the area, then tune on the Quest.** The stated goal is an environment *visible from any altitude and filling the horizon*. The script defaults to `areaHalfExtent: 3000` (6 × 6 km), but **the scene is baked at `900`** — a 1.8 km patch that will not fill the horizon from 500 m up. Decide the real target, re-bake (§8), then profile on-device: lower building/tree counts if it drops below 72 fps, and confirm GPU instancing. | 🔬 headset |
-| 7 | **Verify the camera switcher on the Quest** — B button toggles, first-person eye position, third-person framing. | 🔬 headset |
-| 8 | **Remove `DevColorize` from the Avatar** — a development helper left attached (§7). Check whether it's on other objects too; keep or remove deliberately rather than by accident. | 🏠 any machine |
-> 🏠 = any machine · 🔬 = needs hardware · 💬 = needs a conversation
-
-**Not open, so nobody re-opens them:** the slider centring, the canopy hanging behind the
-pilot, the steering-line routing, and on-device body pose are all **done and verified**
-(2026-07-16).
-
----
-
-## 13. Git workflow
+## 12. Git workflow
 
 ```bash
 git pull                 # always start here — more than one person pushes to this repo
@@ -616,8 +620,9 @@ git push
 conflicts badly if it diverges.
 
 **Always save and commit the scene when it works.** The scene holds the canopy bake, the
-XSens wiring, and every Inspector value. A state that lives only in someone's working tree
-is a state that regresses — that has already happened on this project more than once.
+XSens wiring, and every Inspector value — most of this project's real state lives in that
+file rather than in code. A working state that exists only in one person's working tree
+exists nowhere: every other machine, and every fresh clone, sees the old one.
 
 **Don't commit build output.** `.gitignore` covers the APK and Unity's
 `*_BackUpThisFolder_ButDontShipItWithYourGame/` (~645 MB) — both are far over GitHub's
@@ -627,12 +632,8 @@ is a state that regresses — that has already happened on this project more tha
 
 **This README is the only document in this repo, and it is meant to stay that way.** It
 previously shared the job with a `HANDOFF.md` session log and a `TASKS.md` task list; both
-were folded in here and removed on 2026-07-17. Everything still live from them is above —
-the open work is [§12](#12-open-tasks), the hard-won permanent facts are
-[§11](#11-known-issues-and-permanent-notes), and the rest was superseded history.
+were folded in here and removed on 2026-07-17. Three documents meant three homes for the
+same fact, and they drifted apart. One document, kept current, is worth more than three that
+disagree.
 
-Three documents meant three places for the same fact to live, and they drifted apart more
-than once: the same bug got logged three times under three names, a fixed issue stayed
-"STILL BROKEN" in one file for weeks, and the two files disagreed about whether
-`PlayerMovement` even does anything on a Mac (§7 settles it: it does). **When something
-changes, change it here — and update every section it touches in the same commit.**
+**Start here, and keep it here.**
