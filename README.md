@@ -33,7 +33,7 @@ Matlab. Unity itself computes no physics — it is a renderer.
 6. [Networking — the part that catches everyone](#6-networking--the-part-that-catches-everyone)
 7. [What's in the project](#7-whats-in-the-project)
 8. [The canopy — how it's built and how to change it](#8-the-canopy--how-its-built-and-how-to-change-it)
-9. [Camera and views](#9-camera-and-views)
+9. [Camera, views, and controls](#9-camera-views-and-controls)
 10. [Troubleshooting](#10-troubleshooting)
 11. [Known issues and permanent notes](#11-known-issues-and-permanent-notes)
 12. [Open tasks](#12-open-tasks)
@@ -300,7 +300,7 @@ check `logcat` (§5c) to see whether packets are arriving.
 
 | GameObject | Role |
 |---|---|
-| `Avatar` | The skydiver. XSens sample FBX, **Humanoid** rig. Carries `XsensDevice` (the Editor pose path) + `Animator`. |
+| `Avatar` | The skydiver. XSens sample FBX, **Humanoid** rig. Carries `XsensDevice` (the Editor pose path) + `Animator`. Also carries `DevColorize` — a development tint helper that should come off before this ships ([§12](#12-open-tasks) #8). |
 | `Parachute` | `ProceduralCanopy` — the whole canopy, built in code. See [§8](#8-the-canopy--how-its-built-and-how-to-change-it). |
 | `PhysicsController` | `SimulatorReceiver` (UDP 9764) + `PlayerMovement`. |
 | `XsensUDP` | `XsensUDPReceiver` — the **build** pose path (UDP 9763). Mode = BuildsOnly. |
@@ -320,7 +320,9 @@ check `logcat` (§5c) to see whether packets are arriving.
 | `XsensUDPReceiver.cs` | `XsensUDP` | UDP 9763, **builds only**. Plain socket MXTP02 parser — the pose path the plugin can't provide in an APK. Rotation-only by design. |
 | `CameraViewController.cs` | `Main Camera` | First/third-person. **V** (Editor) / Quest **B** button / `Instance.SetView(bool)`. |
 | `VRCameraRig.cs` | `Main Camera` | Quest head tracking. Falls back to desktop mode if no HMD appears within 5 s. |
-| `PlayerMovement.cs` | `PhysicsController` | The **built-in** physics path via `EOM_Solver.dll` — **Windows only** (`#if UNITY_STANDALONE_WIN`); skipped on Mac/Quest. Exposes `LeftToggle`/`RightToggle`/`SetToggles()`, which `SimulatorReceiver` drives when the lab stream is live. |
+| `PlayerMovement.cs` | `PhysicsController` | **Legacy standalone physics — not the live path.** `SimulatorReceiver` disables it whenever the simulator stream is running, which is normal operation. See [§7 Native](#native). Still owns two things that *are* live: **restart** ([§9](#9-camera-views-and-controls)) and `startHeight` (default 500 m — lower it to test near the ground). Also exposes `LeftToggle`/`RightToggle`/`SetToggles()`, which `SimulatorReceiver` drives from the stream's `delta_l`/`delta_r`. |
+| `DevColorize.cs` | `Avatar` (and possibly others) | **Development only** — tints objects for visibility. Should be removed before this ships. See [§12](#12-open-tasks) #8. |
+| `Editor/FixXsensMaterials.cs` | Editor menu | **Tools → Fix Xsens Materials for URP.** Converts the XSens sample materials from the built-in Standard shader to URP/Lit. Run-once, already done — but see [§11](#11-known-issues-and-permanent-notes) if the avatar ever turns invisible on the headset. |
 | `GroundEnvironment.cs` | `Environment` | Edit-time baker: right-click → **Generate Environment** → town + trees into a saved `EnvironmentBaked` child (nothing is generated at runtime). Raises the camera far-clip to 5000 m and pushes fog past the map edge so the ground stays visible from altitude. **The scene is currently baked at `areaHalfExtent: 900` (a 1.8 × 1.8 km patch), 280 buildings, 1400 trees** — note the *script defaults* are 3000 m / larger counts, and the scene overrides them. Re-bake after changing any of it. See [§12](#12-open-tasks) #6. |
 | `SceneLighting.cs` | `Lighting` | Sun, soft shadows, gradient ambient. |
 | `ToggleArmAnimation.cs` | *not attached* | Swings the arms to match toggle input. **Conflicts with XSens**, which drives the same bones — see [§12](#12-open-tasks). |
@@ -341,10 +343,24 @@ No Matlab toolboxes needed — all three senders use `java.net.DatagramSocket` d
 
 ### Native
 
-`Assets/Plugins/EOM_Solver.dll` — the lab aerodynamics engine, **Windows-only**. It is the
-alternative to the simulator stream: `PlayerMovement` calls it on a Windows standalone
-build. On Mac and on the Quest it is skipped and the state passes through unchanged, which
-is why the **simulator stream (9764) is the path that works everywhere**.
+**`EOM_Solver.dll` — legacy, not in use.**
+
+> **This project does not use `EOM_Solver.dll`, and does not use `PlayerMovement`'s
+> built-in physics.** All flight comes from **Dr. Clarke's team's simulator over UDP 9764**
+> ([§1](#1-how-the-system-works)). This section exists only so nobody mistakes the leftover
+> code for the live path.
+
+`Assets/Plugins/EOM_Solver.dll` is an older, self-contained physics route that predates the
+simulator integration. `PlayerMovement` still contains it behind
+`#if UNITY_STANDALONE_WIN && !UNITY_EDITOR` (the DLL on a Windows player) with a pure-C#
+approximation on every other platform. Neither runs in normal operation: **`SimulatorReceiver`
+disables `PlayerMovement` as soon as the stream is live**, and the stream is the point of
+the project.
+
+It is kept, not deleted, because it is the only thing that animates the scene with **no
+simulator running** — useful for a quick smoke test that the rig, HUD and canopy render.
+Treat anything it produces as a placeholder, never as a result: **it is not the lab's
+aerodynamics.**
 
 ---
 
@@ -429,7 +445,28 @@ pinned to the torso" bug.
 
 ---
 
-## 9. Camera and views
+## 9. Camera, views, and controls
+
+### Controls at a glance
+
+| Action | Editor | Quest 2 |
+|---|---|---|
+| **Toggle first/third person** | **V** | **B** button (right controller) |
+| **Restart the flight** | **R** | **A** button (right controller) |
+| **Steering toggles** | — | **triggers** (left/right), when running the built-in C# physics |
+| **Look around** | mouse-free; desktop fallback | head tracking (always on) |
+
+Restart is `PlayerMovement.Restart()` — it resets the canopy and body to their start
+positions and clears the `_landed` flag, so it works both mid-flight and after landing. The
+toggle and restart are also callable from code (`CameraViewController.Instance.SetView(bool)`),
+which is how a future Matlab UDP flag would drive the view.
+
+> The triggers only steer when `PlayerMovement` is actually running. **While the simulator
+> stream is live, `SimulatorReceiver` disables `PlayerMovement`**, so the toggles come from
+> the stream's `delta_l`/`delta_r` instead and the physical triggers do nothing. That's
+> correct — the lab owns the flight.
+
+### View modes
 
 `CameraViewController.cs` on `Main Camera` owns the view. `VRCameraRig` stays active in
 both modes, so head-tracked look-around always works.
@@ -506,12 +543,38 @@ the headset. Put it on and accept it.
   awkward on Mac. **Without it there is no Quest build at all.** It currently resolves fine
   alongside `xr.management 4.6.0`. If it needs replacing, the candidates are
   `com.unity.xr.oculus` 4.3.0+ or the Meta XR SDK — but replace it, don't just delete it.
-- **`EOM_Solver.dll` is Windows-only.** The simulator stream on 9764 is the cross-platform
-  path and the one the project actually runs on.
+- **The flight comes from Dr. Clarke's team's simulator, over UDP 9764 — nothing else.**
+  `EOM_Solver.dll` and `PlayerMovement`'s built-in physics are **legacy and not in use**;
+  `SimulatorReceiver` disables them whenever the stream is live. Don't debug them, don't
+  present their output as a result, and don't mistake them for the live path.
+  See [§7 Native](#native).
 - **Technion Wi-Fi blocks device-to-device traffic.** Use a hotspot.
   See [§6](#6-networking--the-part-that-catches-everyone).
 - **Bone attachments must use the Hips-rooted `" 1"` bones.** See
   [§8](#8-the-canopy--how-its-built-and-how-to-change-it).
+- **`m_Channels: 3` on `XsensDevice` is correct — don't "fix" it to `2`.** Reading the scene
+  file you'll see `m_Channels: 3` (`Position | Rotation`), while the companion AR project
+  runs `2` (rotation-only), and everything here describes the pose path as rotation-only.
+  That looks like a bug. It isn't. `3` is the **package's own default**; AR's `2` is the
+  deliberate deviation. With `applyRootMotion` off, the plugin writes only the Pelvis's
+  **local Y** (`XsensDevice.cs` ~line 418) — a local transform on a child bone. The Avatar
+  **root**, which is what `SimulatorReceiver` positions, is never touched, so there is no
+  authority conflict. It is also **Editor-only**: builds use `XsensUDPReceiver`
+  ([§1](#1-how-the-system-works)). The system works as-is — leave it alone.
+- **If the avatar is invisible on the Quest, it's the materials — not the rig.** The XSens
+  sample materials ship on the built-in **Standard** shader, which Unity **strips from
+  Android URP builds**, so the avatar renders as nothing on device while looking fine in the
+  Editor. Fix: **Tools → Fix Xsens Materials for URP** (`Assets/Editor/FixXsensMaterials.cs`)
+  converts everything under `Assets/Samples/Xsens` to `Universal Render Pipeline/Lit`,
+  preserving albedo. Already run — this note is here for the next time an avatar or material
+  is added.
+- **Quest head tracking is applied manually, on purpose.** Unity 6 no longer auto-applies
+  the XR pose to a plain Main Camera. `VRCameraRig.cs` reads
+  `InputDevices.GetDeviceAtXRNode(XRNode.Head)` every `LateUpdate` and writes the camera
+  transform itself, using the camera's initial world position as a scene anchor plus the
+  HMD's room-scale offset. **If head tracking ever "stops working", check that this script
+  is alive before suspecting the headset** — and don't "simplify" it by deleting the manual
+  write.
 - **Doc-drift warning.** This README has previously recorded a fix in one section while
   leaving the contradicting claim live in another — and once described the project as built
   on a previous student's system, which it is not. **When a fix lands, update every section
@@ -523,15 +586,14 @@ the headset. Put it on and accept it.
 
 | # | Task | Where |
 |---|---|---|
-| 1 | **Slider height.** Dr. Clarke's rig diagram shows the slider **low, just above the risers** — where it ends up on a fully-open canopy. Ours sits at `sliderDropFrac = 0.30`. Raise it and re-bake (§8). Must be judged **by eye**: the riser height can't be computed offline, because the Inspector-assigned bones are the flat non-moving copies and the real ones only exist at runtime. This deliberately **overrides** HANDOFF's older "roughly halfway down the lines" spec. | 🏠 any machine |
+| 1 | **Slider height.** Dr. Clarke's rig diagram shows the slider **low, just above the risers** — where it ends up on a fully-open canopy. Ours sits at `sliderDropFrac = 0.30`. Raise it and re-bake (§8). Must be judged **by eye**: the riser height can't be computed offline, because the Inspector-assigned bones are the flat non-moving copies and the real ones only exist at runtime. (This deliberately overrides an older written spec that said "roughly halfway down the lines" — **the diagram wins**.) | 🏠 any machine |
 | 2 | **Confirm the position-Z sign convention with the lab.** `SimulatorReceiver.positionZIsAltitude` is currently **ON**; the example data is internally inconsistent. Needs a human answer from the simulator's authors. | 💬 lab |
 | 3 | **Arm ownership — XSens vs `ToggleArmAnimation`.** Both write the same arm bones. Decide the rule: if the suit is live, XSens wins and `ToggleArmAnimation` must be disabled; with no suit, enable it so the toggles are visible. Currently unattached. | 🏠 any machine |
 | 4 | **Verify `SimulatorReceiver` against the real `EOM_Solver` output** on the lab Windows PC — confirm the live stream really matches the 26-field format. | 🔬 lab PC |
 | 5 | **Canopy and avatar headings come from different sources.** The canopy's yaw comes from the **simulator**; the avatar's comes from **XSens**. Nothing ties the two reference frames together, so in `.mvnx` replay they can sit ~180° apart and the steering lines cross. `SimulatorReceiver` already has `headingOffsetDeg` / `invertHeading` for the sim side. Related to #3. | 🔬 needs the suit |
 | 6 | **`GroundEnvironment` — reconcile the area, then tune on the Quest.** The stated goal is an environment *visible from any altitude and filling the horizon*. The script defaults to `areaHalfExtent: 3000` (6 × 6 km), but **the scene is baked at `900`** — a 1.8 km patch that will not fill the horizon from 500 m up. Decide the real target, re-bake (§8), then profile on-device: lower building/tree counts if it drops below 72 fps, and confirm GPU instancing. | 🔬 headset |
 | 7 | **Verify the camera switcher on the Quest** — B button toggles, first-person eye position, third-person framing. | 🔬 headset |
-| 8 | **Remove `DevColorize` from the Avatar** — a development helper left attached. | 🏠 any machine |
-
+| 8 | **Remove `DevColorize` from the Avatar** — a development helper left attached (§7). Check whether it's on other objects too; keep or remove deliberately rather than by accident. | 🏠 any machine |
 > 🏠 = any machine · 🔬 = needs hardware · 💬 = needs a conversation
 
 **Not open, so nobody re-opens them:** the slider centring, the canopy hanging behind the
@@ -561,6 +623,16 @@ is a state that regresses — that has already happened on this project more tha
 `*_BackUpThisFolder_ButDontShipItWithYourGame/` (~645 MB) — both are far over GitHub's
 100 MB per-file limit.
 
-`HANDOFF.md` is a running session log with deeper technical detail (wire formats, frame
-math, session-by-session history). `TASKS.md` is the live task list. **This README is the
-place to start.**
+---
+
+**This README is the only document in this repo, and it is meant to stay that way.** It
+previously shared the job with a `HANDOFF.md` session log and a `TASKS.md` task list; both
+were folded in here and removed on 2026-07-17. Everything still live from them is above —
+the open work is [§12](#12-open-tasks), the hard-won permanent facts are
+[§11](#11-known-issues-and-permanent-notes), and the rest was superseded history.
+
+Three documents meant three places for the same fact to live, and they drifted apart more
+than once: the same bug got logged three times under three names, a fixed issue stayed
+"STILL BROKEN" in one file for weeks, and the two files disagreed about whether
+`PlayerMovement` even does anything on a Mac (§7 settles it: it does). **When something
+changes, change it here — and update every section it touches in the same commit.**
