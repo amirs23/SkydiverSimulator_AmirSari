@@ -193,6 +193,11 @@ All three default to `127.0.0.1`, which is correct for Editor-on-this-machine.
 banks into the turn, and the arms pull down alternately as the toggles oscillate. With
 `animate_to_unity`, the body pose animates.
 
+> **The avatar stays upright under the banking canopy, and that is correct for
+> `sim_to_unity`** — the synthetic sender holds the skydiver level on purpose. Only
+> `sim_replay` carries a real skydiver attitude. See
+> [§7 — which sender to run](#which-sender-to-run).
+
 Press **V** to toggle first/third person.
 
 ---
@@ -339,6 +344,49 @@ check `logcat` (§5c) to see whether packets are arriving.
 | `sim_out.mat` | **Gitignored** — a per-machine lab recording. Ask Sari for it, or use `sim_to_unity.m` instead, which needs nothing. |
 
 No Matlab toolboxes needed — all three senders use `java.net.DatagramSocket` directly.
+
+#### Which sender to run
+
+`sim_to_unity.m` and `sim_replay.m` look interchangeable from the outside — same 26-field
+wire format, same port 9764, same receiver. **They are not.** Picking the wrong one is the
+usual reason the scene does something you did not expect.
+
+| | `sim_to_unity.m` | `sim_replay.m` |
+|---|---|---|
+| Where the numbers come from | **Generated in the script.** Reads no file | **Dr. Clarke's simulator.** Replays `sim_out.mat` |
+| Flight path | Hardcoded banked spiral: R = 40 m, from 200 m, 5 m/s down, 25 °/s turn | Whatever the lab recorded — 200 s, 20 001 samples |
+| Canopy attitude | Rolls a fixed **15°** into the turn | Real `phi_b/theta_b/psi_b` |
+| **Skydiver attitude** | **Held upright — roll and pitch hardcoded to 0**, heading only | Real `phi_s/theta_s/psi_s` |
+| Needs a data file | No | Yes (gitignored — ask Sari) |
+| Prints on start | `Sending 26-field spiral-descent test...` | `Replaying <file> (N samples)...` |
+| What it demonstrates | That the **pipeline** works, isolated from the physics | That the **physics** renders correctly |
+
+**Use `sim_to_unity.m`** as the first thing you ever run, and any time you want to know
+whether Matlab → UDP → Unity → canopy → HUD is alive. It needs nothing but the project.
+
+**Use `sim_replay.m`** whenever the *behaviour* matters rather than the plumbing — and in
+particular it is **the only sender that can exercise `SimulatorReceiver.driveBodyRotation`**,
+because it is the only one carrying a real skydiver attitude. Under `sim_to_unity` the
+avatar will turn but never tilt no matter how that checkbox is set, because the script
+sends it zero roll and zero pitch (`sim_to_unity.m`, `att_s = [0, 0, yaw]`).
+
+> **The synthetic spiral is not a physics result.** It is a fixed path written into the
+> script. Use it to prove the system works; never present its output as simulator output.
+
+**What the real recording actually contains** (`sim_out.mat`, measured across all 20 001
+samples) — useful for knowing what to expect on screen:
+
+| channel | range |
+|---|---|
+| roll `phi_s` | −2.53° … +2.47° |
+| pitch `theta_s` | −11.32° … +1.51° |
+| heading `psi_s` | −0.62° … +44.02° |
+
+The skydiver channels are **identical to the parachute channels** in all three axes
+(`phi_s ≡ phi_b`, `theta_s ≡ theta_b`, `psi_s ≡ psi_b`, to the last digit) — the lab's model
+carries the skydiver rigidly with the canopy. So with `driveBodyRotation` on, the avatar
+tracks the canopy exactly. Expect a **gentle lean**, not a dramatic bank: the large motion
+in this recording is the 44° of heading change.
 
 ### Native
 
