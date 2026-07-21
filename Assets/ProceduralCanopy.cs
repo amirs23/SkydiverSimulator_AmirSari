@@ -259,14 +259,21 @@ public class ProceduralCanopy : MonoBehaviour
     void LateUpdate()
     {
         // The canopy's origin is its NOSE (geometry runs z = 0 → -chord), but the pilot
-        // must hang under the wing's CENTRE. Offsetting by the rotated chord-centre
-        // vector puts the chord centre on the follow point, so the canopy banks about
-        // its own centre instead of swinging the whole wing around the pilot.
+        // must hang under the wing's CENTRE. Offsetting by the chord-centre vector puts
+        // the chord centre on the follow point, so the canopy banks about its own centre
+        // instead of swinging the whole wing around the pilot.
+        // The WHOLE offset is rotated, followOffset included: the pilot hangs along the
+        // canopy's own down-axis, the way he hangs from the lines. Applying followOffset
+        // in world space instead pins the pilot straight below the nose while the slider
+        // (span * sliderDropFrac below the origin) swings out with the bank — so on any
+        // turn the avatar is left behind, off to the side of where the lines converge,
+        // by sliderDropFrac * span * sin(bank). Harmless while the slider sat high; very
+        // visible once it was lowered to 0.55 (a 4.95 m lever arm).
         // Rotation is driven by SimulatorReceiver in FixedUpdate, so it is already
         // current here (this script is [DefaultExecutionOrder(10000)]).
         if (followTarget != null)
-            transform.position = followTarget.position + followOffset
-                               + transform.rotation * new Vector3(0f, 0f, chord * 0.5f);
+            transform.position = followTarget.position
+                               + transform.rotation * (followOffset + new Vector3(0f, 0f, chord * 0.5f));
         UpdateDynamicLines();
     }
 
